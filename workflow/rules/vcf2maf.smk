@@ -16,6 +16,12 @@ rule vcf2maf:
     params:
         tumor_id=lambda wc: get_contrast_caller_row(wc)["tumor_id"],
         normal_id=lambda wc: (get_contrast_caller_row(wc)["normal_id"] or "NA"),
+        # literal sample-column names inside the VCF's genotype fields; only
+        # differ from tumor_id/normal_id for callers with generic labels
+        # (e.g. Strelka2's "TUMOR"/"NORMAL"). Fall back to tumor_id/normal_id
+        # if an older contrasts.tsv without these columns is in use.
+        vcf_tumor_id=lambda wc: (get_contrast_caller_row(wc).get("vcf_tumor_id") or get_contrast_caller_row(wc)["tumor_id"]),
+        vcf_normal_id=lambda wc: (get_contrast_caller_row(wc).get("vcf_normal_id") or get_contrast_caller_row(wc)["normal_id"] or "NA"),
         ref_fasta=config["ref_fasta"],
         build=config["genome_build"],
         vep_path=config["vcf2maf"]["vep_path"],
@@ -31,4 +37,5 @@ rule vcf2maf:
         "bash {workflow.basedir}/scripts/convert_to_maf.sh "
         "{input.vcf} {output.maf} {params.tumor_id} {params.normal_id} "
         "{params.ref_fasta} {params.build} {params.vep_path} {params.vep_data} "
-        "{params.cache_version} {params.vcf2maf_pl} > {log} 2>&1"
+        "{params.cache_version} {params.vcf2maf_pl} "
+        "{params.vcf_tumor_id} {params.vcf_normal_id} > {log} 2>&1"

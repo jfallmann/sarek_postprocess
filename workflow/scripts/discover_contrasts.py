@@ -108,8 +108,24 @@ def vcf_samples(vcf_path):
         return []
 
 
+# Some callers (Strelka2's somatic workflow) do not put the real sample IDs
+# in the VCF genotype columns at all - they hard-code these generic labels
+# instead. vcf2maf.pl still needs to select genotype columns by these exact
+# literal names (--vcf-tumor-id/--vcf-normal-id), while --tumor-id/
+# --normal-id (the names actually written into the output MAF) must still be
+# the real sample IDs, or every Strelka-derived contrast would collide under
+# the same "TUMOR"/"NORMAL" barcode once merged cohort-wide.
+GENERIC_VCF_SAMPLE_LABELS = {"tumor", "normal"}
+
+
 def resolve_tumor_normal(contrast, samples, sample_meta):
     """Resolve which VCF sample column is tumor vs normal.
+
+    Returns (tumor_id, normal_id, vcf_tumor_id, vcf_normal_id) where
+    tumor_id/normal_id are the real sample IDs to report in the output MAF,
+    and vcf_tumor_id/vcf_normal_id are the literal column names present in
+    the VCF's genotype columns (identical to tumor_id/normal_id unless the
+    caller uses generic labels, e.g. Strelka2's "TUMOR"/"NORMAL").
 
     Preference order: exact match against contrast tokens, then substring
     match, then samplesheet 'status' (1 = tumor, 0 = normal), then
@@ -121,7 +137,12 @@ def resolve_tumor_normal(contrast, samples, sample_meta):
         tumor_tok, normal_tok = contrast, None
 
     if len(samples) == 1:
-        return samples[0], None
+        return samples[0], None, samples[0], None
+
+    if normal_tok is not None and {s.lower() for s in samples} == GENERIC_VCF_SAMPLE_LABELS:
+        vcf_t = next(s for s in samples if s.lower() == "tumor")
+        vcf_n = next(s for s in samples if s.lower() == "normal")
+        return tumor_tok, normal_tok, vcf_t, vcf_n
 
     t_id = n_id = None
     for s in samples:
@@ -150,7 +171,7 @@ def resolve_tumor_normal(contrast, samples, sample_meta):
             t_id = remaining.pop(0)
         if normal_tok is not None and n_id is None and remaining:
             n_id = remaining.pop(0)
-    return t_id, n_id
+    return t_id, n_id, t_id, n_id
 
 
 def find_vcfs_for_caller(outdir, caller, override_dir=""):
@@ -292,7 +313,7 @@ def main():
             seen.add(key)
 
             samples = vcf_samples(vcf_path)
-            t_id, n_id = resolve_tumor_normal(contrast, samples, sample_meta)
+            t_id, n_id, vcf_t_id, vcf_n_id = resolve_tumor_normal(contrast, samples, sample_meta)
             ctype = "tumor_normal" if (n_id and "_vs_" in contrast) else "tumor_only"
 
             rows.append({
@@ -301,6 +322,8 @@ def main():
                 "type": ctype,
                 "tumor_id": t_id or "",
                 "normal_id": n_id or "",
+                "vcf_tumor_id": vcf_t_id or "",
+                "vcf_normal_id": vcf_n_id or "",
                 "vcf_path": str(vcf_path),
                 "patient": sample_meta.get(t_id, {}).get("patient", ""),
                 "sex": sample_meta.get(t_id, {}).get("sex", ""),
@@ -311,7 +334,8 @@ def main():
 
     Path(args.out).parent.mkdir(parents=True, exist_ok=True)
     with open(args.out, "w", newline="") as fh:
-        fieldnames = ["contrast", "caller", "type", "tumor_id", "normal_id", "vcf_path", "patient", "sex"]
+        fieldnames = ["contrast", "caller", "type", "tumor_id", "normal_id", "vcf_tumor_id", "vcf_normal_id",
+                      "vcf_path", "patient", "sex"]
         writer = csv.DictWriter(fh, fieldnames=fieldnames, delimiter="\t")
         writer.writeheader()
         for r in rows:

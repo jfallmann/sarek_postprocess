@@ -8,7 +8,14 @@
 #
 # Usage:
 #   convert_to_maf.sh <in_vcf> <out_maf> <tumor_id> <normal_id_or_NA> \
-#                      <ref_fasta> <build> <vep_path> <vep_data> <cache_version> <vcf2maf_pl>
+#                      <ref_fasta> <build> <vep_path> <vep_data> <cache_version> <vcf2maf_pl> \
+#                      [<vcf_tumor_id_or_NA> [<vcf_normal_id_or_NA>]]
+#
+# vcf_tumor_id/vcf_normal_id are the literal sample-column names inside the
+# VCF's genotype fields; they only differ from tumor_id/normal_id when a
+# caller hard-codes generic labels there (e.g. Strelka2's "TUMOR"/"NORMAL"
+# instead of the real sample IDs). If omitted, they default to tumor_id/
+# normal_id (i.e. no relabeling, matching vcf2maf.pl's own default).
 set -euo pipefail
 
 IN_VCF="$1"
@@ -21,12 +28,25 @@ VEP_PATH="$7"
 VEP_DATA="$8"
 VEP_CACHE="$9"
 V2M="${10}"
+VCF_TUMOR_ID="${11:-$TUMOR_ID}"
+VCF_NORMAL_ID="${12:-$NORMAL_ID}"
+[[ -n "$VCF_TUMOR_ID" && "$VCF_TUMOR_ID" != "NA" ]] || VCF_TUMOR_ID="$TUMOR_ID"
+[[ -n "$VCF_NORMAL_ID" && "$VCF_NORMAL_ID" != "NA" ]] || VCF_NORMAL_ID="$NORMAL_ID"
 
 V2M_RESOLVED="$(command -v "$V2M" 2>/dev/null || true)"
 [[ -n "$V2M_RESOLVED" ]] || { echo "ERROR: vcf2maf.pl not found (V2M=$V2M)"; exit 1; }
 # perl does not search PATH for its script argument (only the shell does),
 # so pass the fully resolved path rather than the bare/PATH-relative name.
 V2M="$V2M_RESOLVED"
+
+# vcf2maf.pl's --vep-path must be the *directory* containing the vep
+# executable (it internally execs "<vep_path>/vep"), not a bare command
+# name resolved via PATH.
+if [[ ! -d "$VEP_PATH" ]]; then
+  vep_bin="$(command -v "$VEP_PATH" 2>/dev/null || true)"
+  [[ -n "$vep_bin" ]] || { echo "ERROR: vep executable not found (vep_path=$VEP_PATH)"; exit 1; }
+  VEP_PATH="$(dirname "$vep_bin")"
+fi
 [[ -f "$REF_FASTA" ]] || { echo "ERROR: REF_FASTA not found: $REF_FASTA"; exit 1; }
 [[ -f "$IN_VCF" ]] || { echo "ERROR: input VCF not found: $IN_VCF"; exit 1; }
 [[ -n "$TUMOR_ID" ]] || { echo "ERROR: TUMOR_ID is empty - discover_contrasts.py could not resolve it"; exit 1; }
@@ -68,13 +88,13 @@ if [[ "$IN_VCF" == *.vcf.gz ]]; then
 fi
 
 cmd=(perl "$V2M" --input-vcf "$in_vcf" --output-maf "$OUT_MAF" \
-     --tumor-id "$TUMOR_ID" \
+     --tumor-id "$TUMOR_ID" --vcf-tumor-id "$VCF_TUMOR_ID" \
      --ref-fasta "$REF_FASTA" --ncbi-build "$BUILD" \
      --vep-data "$VEP_DATA" --species homo_sapiens --cache-version "$VEP_CACHE" \
      --vep-path "$VEP_PATH")
 
 if [[ -n "$NORMAL_ID" && "$NORMAL_ID" != "NA" ]]; then
-  cmd+=(--normal-id "$NORMAL_ID")
+  cmd+=(--normal-id "$NORMAL_ID" --vcf-normal-id "$VCF_NORMAL_ID")
 fi
 
 echo "[convert_to_maf] ${cmd[*]}"
