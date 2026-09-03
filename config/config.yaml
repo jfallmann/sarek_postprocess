@@ -1,0 +1,99 @@
+# =============================================================================
+# sarek_postprocess configuration
+# One config.yaml per Sarek run/cohort. Copy this template and adjust paths.
+# =============================================================================
+
+# --- Sarek run inputs -------------------------------------------------------
+# Absolute path to the Sarek samplesheet used for the run (read only for
+# metadata: patient/sample/sex/status -> used to label clinical annotations).
+# Tumor-only vs tumor-normal pairing itself is NOT re-derived from this file;
+# it is inferred from Sarek's own output directory naming (see discover step).
+samplesheet: "/path/to/samplesheet.csv"
+
+# Absolute path to Sarek's --outdir for this run.
+sarek_outdir: "/path/to/sarek/results"
+
+# Output directory for this postprocessing run.
+outdir: "results"
+
+# Genome build used by the Sarek run (must match VEP cache / reference used).
+genome_build: "GRCh38"
+
+# Reference FASTA used by Sarek (needed by vcf2maf for ref-allele checks).
+ref_fasta: "/path/to/Homo_sapiens_assembly38.fasta"
+
+# --- vcf2maf / VEP ------------------------------------------------------------
+# vcf2maf re-runs VEP internally to produce MAF-formatted transcript picks.
+# Point these at the same offline VEP cache Sarek used.
+vcf2maf:
+  vep_path: "vep"          # vep binary/wrapper, in PATH or absolute
+  vep_data: "/path/to/vep_cache"
+  cache_version: 113
+  vcf2maf_pl: "vcf2maf.pl" # in PATH or absolute path
+
+# --- Callers to include -------------------------------------------------------
+# Manta is always excluded from MAF conversion (not MAF-compatible) and
+# handled separately if sv_analysis is enabled.
+callers:
+  - mutect2
+  - strelka
+
+# --- Sample cohort subsetting -------------------------------------------------
+# Regex applied to contrast/sample names to restrict cohort-wide plots and
+# driver-candidate ranking to one project if the outdir holds several.
+# Leave empty ("") to include every contrast found.
+sample_subset_regex: ""
+
+# --- Sensitive/parental pool contrasts ---------------------------------------
+# List of contrast names (as they appear in contrasts.tsv, e.g.
+# "Bulk_resistant_vs_Bulk_sensitive" or a tumor-only contrast name run against
+# the sensitive pool) that represent the drug-sensitive baseline. Used only
+# for the OPTIONAL exploratory mafCompare/forestPlot step in driver_candidates
+# (resistant contrast vs pooled sensitive contrasts) - leave empty to skip.
+sensitive_contrasts: []
+
+# --- Consensus / filtering thresholds (used by driver candidate ranking) -----
+filtering:
+  pass_only: true
+  # Strelka indels lack a reliable QUAL; keep this override consistent with
+  # the caller-specific behaviour already validated on the WES cohort.
+  qual_override_by_caller:
+    strelka_indels: false
+  min_depth: 20
+  min_alt_count: 3
+  min_vaf: 0.05
+  max_gnomad_af: 0.001          # uses gnomADe_AF/gnomADg_AF from VEP cache (--everything)
+  consensus_min_callers: 2      # variant must be called by >= N callers to be a "candidate driver"
+  exclude_gene_regex: "(?i)^MUC|^TTN|^HLA|^NEB|^OBSCN|^USH2A"
+
+# Optional: TSV of known baseline mutations for the parental/reference line
+# (e.g. a COSMIC Cell Lines Project export) used to strip out pre-existing
+# mutations before ranking acquired/candidate driver mutations. Leave empty
+# to skip this step.
+baseline_mutations_tsv: ""
+
+# --- Driver / resistance gene panel ------------------------------------------
+# CSV with a single column "Gene" (Hugo symbols) used to prioritize candidates.
+gene_panel_csv: "config/driver_resistance_genes.csv"
+
+# --- Mutational signatures ----------------------------------------------------
+signatures:
+  enabled: true
+  caller: "mutect2"              # SNV-optimized caller used for signature fitting
+  reference_set: "COSMIC_v3.4"   # passed to MutationalPatterns::get_known_signatures()
+  genome_package: "BSgenome.Hsapiens.UCSC.hg38"
+
+# --- Structural variants (Manta) ---------------------------------------------
+sv_analysis:
+  enabled: true
+
+# --- Actionability report (lowest priority, offline static tables only) -----
+actionability:
+  enabled: false
+  cancer_gene_census_tsv: ""     # optional static CGC export
+  oncokb_gene_list_tsv: ""       # optional static OncoKB cancer gene list export
+  civic_variant_summary_tsv: ""  # optional static CIViC variant summary export
+
+# --- Cluster execution --------------------------------------------------------
+# Per-rule resources are defined in workflow/profiles/slurm/config.yaml
+threads_default: 4

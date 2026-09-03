@@ -1,0 +1,12 @@
+name: sarek_postprocess-vcf2maf
+channels:
+  - conda-forge
+  - bioconda
+dependencies:
+  - vcf2maf=1.6.21
+  - ensembl-vep=113
+  - bcftools=1.20
+  - samtools=1.20
+  - htslib=1.20
+  - perl=5.32
+  - python=3.12

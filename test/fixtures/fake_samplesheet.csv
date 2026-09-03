@@ -1,0 +1,4 @@
+patient,sex,status,sample,lane,fastq_1,fastq_2
+Bulk_sen,XY,0,Bulk_sensitive,lane_1,r1.fq.gz,r2.fq.gz
+BC1_1,XY,0,BC1_naive,lane_1,r1.fq.gz,r2.fq.gz
+Bulk_res,XY,0,Bulk_resistant,lane_1,r1.fq.gz,r2.fq.gz

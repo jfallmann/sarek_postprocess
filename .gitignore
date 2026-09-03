@@ -216,3 +216,9 @@ __marimo__/
 
 # Streamlit
 .streamlit/secrets.toml
+
+# sarek_postprocess pipeline outputs / local run artifacts
+results/
+.snakemake/
+*.rds.gz
+config/*.local.yaml

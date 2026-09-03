@@ -1,0 +1,50 @@
+import pandas as pd
+from snakemake.exceptions import WorkflowError
+
+configfile: "config/config.yaml"
+
+OUTDIR = config["outdir"]
+
+
+wildcard_constraints:
+    contrast=r"[^/]+",
+    caller=r"[A-Za-z0-9_]+",
+
+
+def get_contrasts_df():
+    """Read the (contrast, caller) table produced by the discover_contrasts
+    checkpoint. Cached per Snakemake invocation is unnecessary here since the
+    file is small; re-reading keeps this simple and always up to date."""
+    cp = checkpoints.discover_contrasts.get()
+    df = pd.read_csv(cp.output.tsv, sep="\t", dtype=str)
+    df["normal_id"] = df["normal_id"].fillna("")
+    return df
+
+
+include: "rules/discover.smk"
+include: "rules/vcf2maf.smk"
+include: "rules/consolidate.smk"
+include: "rules/oncoplots.smk"
+include: "rules/drivers.smk"
+include: "rules/signatures.smk"
+include: "rules/sv.smk"
+include: "rules/actionability.smk"
+
+
+def get_all_targets(wildcards):
+    targets = [
+        f"{OUTDIR}/oncoplots/cohort/.done",
+        f"{OUTDIR}/drivers/cohort_ranked_drivers.tsv",
+    ]
+    if config.get("signatures", {}).get("enabled", False):
+        targets.append(f"{OUTDIR}/signatures/cohort/.done")
+    if config.get("sv_analysis", {}).get("enabled", False):
+        targets += all_manta_sv_tsvs(wildcards)
+    if config.get("actionability", {}).get("enabled", False):
+        targets.append(f"{OUTDIR}/actionability/actionability_report.tsv")
+    return targets
+
+
+rule all:
+    input:
+        get_all_targets,

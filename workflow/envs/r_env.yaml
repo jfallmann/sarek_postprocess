@@ -1,0 +1,16 @@
+name: sarek_postprocess-r
+channels:
+  - conda-forge
+  - bioconda
+dependencies:
+  - r-base=4.3
+  - bioconductor-maftools
+  - r-data.table
+  - bioconductor-complexheatmap
+  - bioconductor-mutationalpatterns
+  - bioconductor-variantannotation
+  - bioconductor-bsgenome.hsapiens.ucsc.hg38
+  - r-stringr
+  - r-dplyr
+  - r-purrr
+  - r-r.utils
