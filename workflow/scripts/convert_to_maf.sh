@@ -47,6 +47,18 @@ if [[ ! -d "$VEP_PATH" ]]; then
   [[ -n "$vep_bin" ]] || { echo "ERROR: vep executable not found (vep_path=$VEP_PATH)"; exit 1; }
   VEP_PATH="$(dirname "$vep_bin")"
 fi
+# VEP's --dir/vcf2maf's --vep-data must be the cache *root* (the directory
+# that directly contains "homo_sapiens/<cache_version>_<build>/"), not that
+# species/version directory itself - VEP appends "homo_sapiens/..." on top
+# of whatever --dir it is given. If vep_data is configured as the full
+# nested path (a common mistake when copying the path Sarek's cache actually
+# lives under), auto-correct it back to the root two levels up.
+vep_data_parent="$(dirname "$VEP_DATA")"
+if [[ "$(basename "$vep_data_parent")" == "homo_sapiens" ]]; then
+  echo "[convert_to_maf] vep_data '$VEP_DATA' looks like .../homo_sapiens/<version>_<build>; using its cache root '$(dirname "$vep_data_parent")' instead"
+  VEP_DATA="$(dirname "$vep_data_parent")"
+fi
+
 [[ -f "$REF_FASTA" ]] || { echo "ERROR: REF_FASTA not found: $REF_FASTA"; exit 1; }
 [[ -f "$IN_VCF" ]] || { echo "ERROR: input VCF not found: $IN_VCF"; exit 1; }
 [[ -n "$TUMOR_ID" ]] || { echo "ERROR: TUMOR_ID is empty - discover_contrasts.py could not resolve it"; exit 1; }

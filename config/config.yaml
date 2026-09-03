@@ -27,6 +27,11 @@ ref_fasta: "/path/to/Homo_sapiens_assembly38.fasta"
 # Point these at the same offline VEP cache Sarek used.
 vcf2maf:
   vep_path: "vep"          # vep binary/wrapper, in PATH or absolute
+  # Cache ROOT dir, i.e. the directory that directly contains
+  # "homo_sapiens/<cache_version>_<genome_build>/" - NOT that species/version
+  # subdirectory itself (a common mistake if you copy the path from Sarek's
+  # cache download logs). If you accidentally point this at the nested
+  # path, convert_to_maf.sh auto-corrects it back to the root.
   vep_data: "/path/to/vep_cache"
   cache_version: 116          # must match the ensembl-vep version pinned in workflow/envs/vcf2maf.yaml
   vcf2maf_pl: "vcf2maf.pl" # in PATH or absolute path
