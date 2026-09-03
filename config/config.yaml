@@ -38,6 +38,21 @@ callers:
   - mutect2
   - strelka
 
+# --- Manual tool output directory overrides -----------------------------------
+# Override auto-discovery of any caller's contrast directories. Leave empty
+# ("") to use Sarek's own <sarek_outdir>/annotation/<caller> (falling back to
+# variant_calling/<caller>) layout. Set a path if you reran a tool manually,
+# with different settings, or somewhere outside the Sarek outdir - each
+# override must still contain one subdirectory per contrast, matching
+# Sarek's own <contrast>/<contrast>.<caller>....ext naming.
+tool_output_dirs:
+  mutect2: ""
+  strelka: ""
+  manta: ""
+  # CNVkit is NOT part of Sarek's own --tools; point this at wherever you ran
+  # it yourself. If left empty, "<sarek_outdir>/cnvkit" is assumed.
+  cnvkit: ""
+
 # --- Sample cohort subsetting -------------------------------------------------
 # Regex applied to contrast/sample names to restrict cohort-wide plots and
 # driver-candidate ranking to one project if the outdir holds several.
@@ -86,6 +101,19 @@ signatures:
 # --- Structural variants (Manta) ---------------------------------------------
 sv_analysis:
   enabled: true
+
+# --- Copy number variants (CNVkit) --------------------------------------------
+# CNVkit is run outside Sarek (see tool_output_dirs.cnvkit above). Uses
+# .call.cns (preferred, has integer copy-number calls) or .cns (log2-ratio
+# segments only) per contrast, with the "gene" column CNVkit annotates from
+# your target/antitarget BED at call time.
+cnv:
+  enabled: true
+  min_log2_gain: 0.3       # cnvkit log2 ratio threshold to call a gene "gain"
+  min_log2_loss: -0.3      # cnvkit log2 ratio threshold to call a gene "loss"
+  # Genes shown in the cohort CNV heatmap; defaults to gene_panel_csv above
+  # if left empty.
+  heatmap_gene_panel_csv: ""
 
 # --- Actionability report (lowest priority, offline static tables only) -----
 actionability:

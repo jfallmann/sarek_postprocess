@@ -9,6 +9,8 @@
 ##   - VEP IMPACT / consequence severity already present in the MAF
 ##   - optional mafCompare/forestPlot vs the pooled "sensitive" contrasts,
 ##     reported as exploratory (unadjusted) evidence, not a hard filter
+##   - optional corroborating CNVkit copy-number evidence (gain/loss calls
+##     for the same gene in the same or other contrasts)
 ##
 ## Adapted from GENOMICS/MAF_Analysis.R filtering and
 ## GENOMICS/MAF_filter_high_confidence.R recurrence logic.
@@ -26,6 +28,7 @@ sensitive_contrasts <- unlist(snakemake@params[["sensitive_contrasts"]])
 filtering       <- snakemake@params[["filtering"]]
 gene_panel_csv  <- snakemake@params[["gene_panel_csv"]]
 baseline_tsv    <- snakemake@params[["baseline_mutations_tsv"]]
+cnv_calls_tsv   <- snakemake@params[["cnv_calls_tsv"]]
 out_per_contrast_dir <- snakemake@params[["out_per_contrast_dir"]]
 out_cohort_ranked     <- snakemake@output[["cohort_ranked"]]
 
@@ -77,6 +80,30 @@ recur <- all_dt[, .(
 ), by = Hugo_Symbol]
 recur[, In_Gene_Panel := Hugo_Symbol %in% gene_panel]
 recur[, Score := n_contrasts + 0.5 * In_Gene_Panel]
+
+## Optional corroborating CNVkit evidence ------------------------------------
+if (!is.null(cnv_calls_tsv) && nzchar(cnv_calls_tsv) && file.exists(cnv_calls_tsv) &&
+    file.info(cnv_calls_tsv)$size > 0) {
+  cnv_calls <- fread(cnv_calls_tsv)
+  if (all(c("Hugo_Symbol", "Call", "Contrast") %in% names(cnv_calls))) {
+    cnv_summary <- cnv_calls[Call != "neutral", .(
+      CNV_Gain_Contrasts = paste(sort(unique(Contrast[Call == "gain"])), collapse = ";"),
+      CNV_Loss_Contrasts = paste(sort(unique(Contrast[Call == "loss"])), collapse = ";"),
+      n_CNV_gain = uniqueN(Contrast[Call == "gain"]),
+      n_CNV_loss = uniqueN(Contrast[Call == "loss"])
+    ), by = Hugo_Symbol]
+    recur <- merge(recur, cnv_summary, by = "Hugo_Symbol", all.x = TRUE)
+    for (col in c("n_CNV_gain", "n_CNV_loss")) recur[is.na(get(col)), (col) := 0L]
+    for (col in c("CNV_Gain_Contrasts", "CNV_Loss_Contrasts")) recur[is.na(get(col)), (col) := ""]
+    recur[, Score := Score + 0.25 * (n_CNV_gain > 0 | n_CNV_loss > 0)]
+    message("Merged CNVkit evidence for ", nrow(cnv_summary), " genes with a gain/loss call")
+  } else {
+    message("CNV calls TSV missing expected columns; skipping CNV evidence merge")
+  }
+} else {
+  message("No CNV calls TSV configured/found; skipping CNV evidence merge")
+}
+
 setorder(recur, -Score, -n_contrasts, Hugo_Symbol)
 
 fwrite(recur, out_cohort_ranked, sep = "\t", quote = FALSE)

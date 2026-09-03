@@ -4,8 +4,9 @@ Standalone Snakemake pipeline that takes the output of an nf-core/Sarek run
 (Strelka2, Mutect2, Manta, VEP+SnpEff `--everything` annotation) and derives:
 
 1. **Candidate driver/resistance genes** per contrast and cohort-wide,
-   ranked by cross-caller consensus, recurrence across contrasts, and
-   membership in a curated driver/resistance gene panel.
+   ranked by cross-caller consensus, recurrence across contrasts,
+   membership in a curated driver/resistance gene panel, and corroborating
+   CNVkit copy-number gain/loss calls where available.
 2. **Cohort-wide summary plots**: oncoplot, MAF summary dashboard, and
    mutational signature fitting (COSMIC reference signatures via
    MutationalPatterns) across all contrasts.
@@ -14,6 +15,9 @@ Standalone Snakemake pipeline that takes the output of an nf-core/Sarek run
    CIViC exports.
 
 Manta structural variants are summarized separately (not MAF-compatible).
+CNVkit copy-number segments (CNVkit is not part of Sarek's own `--tools` and
+must be run separately) are summarized to gene level and cross-referenced
+against the driver list and cohort heatmap if available.
 
 ## How it works
 
@@ -35,11 +39,16 @@ adapts to however many samples/contrasts an outdir actually contains.
    panel, and `sensitive_contrasts` in the config if you want the optional
    mafCompare/forestPlot step (resistant clone vs pooled sensitive
    contrasts).
-3. Dry-run first:
+3. If you reran any caller manually, with different settings, or outside
+   the Sarek outdir, point `tool_output_dirs.<mutect2|strelka|manta>` at
+   that exact directory instead of relying on auto-discovery under
+   `sarek_outdir`. CNVkit always needs `tool_output_dirs.cnvkit` (or the
+   default `<sarek_outdir>/cnvkit`) since Sarek doesn't run it.
+4. Dry-run first:
    ```bash
    snakemake -s workflow/Snakefile --configfile config/my_run.yaml -n
    ```
-4. Run on the cluster with a Snakemake executor plugin/profile (e.g. Slurm):
+5. Run on the cluster with a Snakemake executor plugin/profile (e.g. Slurm):
    ```bash
    snakemake -s workflow/Snakefile --configfile config/my_run.yaml \
      --use-conda --executor slurm --jobs 50

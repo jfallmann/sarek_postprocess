@@ -222,3 +222,4 @@ results/
 .snakemake/
 *.rds.gz
 config/*.local.yaml
+__pycache__/

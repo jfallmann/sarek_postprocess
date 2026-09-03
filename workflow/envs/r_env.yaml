@@ -7,6 +7,7 @@ dependencies:
   - bioconductor-maftools
   - r-data.table
   - bioconductor-complexheatmap
+  - r-circlize
   - bioconductor-mutationalpatterns
   - bioconductor-variantannotation
   - bioconductor-bsgenome.hsapiens.ucsc.hg38

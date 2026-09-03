@@ -21,10 +21,20 @@ def get_contrasts_df():
     return df
 
 
+def get_cnv_df():
+    """Read the (contrast, cns_path) table produced by the discover_contrasts
+    checkpoint's CNVkit discovery. Rows with no cns_path found are dropped."""
+    cp = checkpoints.discover_contrasts.get()
+    df = pd.read_csv(cp.output.cnv_tsv, sep="\t", dtype=str)
+    df["genemetrics_path"] = df["genemetrics_path"].fillna("")
+    return df[df["cns_path"].notna() & (df["cns_path"] != "")]
+
+
 include: "rules/discover.smk"
 include: "rules/vcf2maf.smk"
 include: "rules/consolidate.smk"
 include: "rules/oncoplots.smk"
+include: "rules/cnv.smk"
 include: "rules/drivers.smk"
 include: "rules/signatures.smk"
 include: "rules/sv.smk"
@@ -40,6 +50,8 @@ def get_all_targets(wildcards):
         targets.append(f"{OUTDIR}/signatures/cohort/.done")
     if config.get("sv_analysis", {}).get("enabled", False):
         targets += all_manta_sv_tsvs(wildcards)
+    if config.get("cnv", {}).get("enabled", False):
+        targets.append(f"{OUTDIR}/cnv/cohort/cnv_heatmap.pdf")
     if config.get("actionability", {}).get("enabled", False):
         targets.append(f"{OUTDIR}/actionability/actionability_report.tsv")
     return targets

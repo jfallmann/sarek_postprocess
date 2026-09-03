@@ -2,9 +2,20 @@ def cohort_consensus_tsvs(wildcards):
     return [f"{OUTDIR}/maf_consolidated/{c}.consensus.tsv" for c in all_contrasts(wildcards)]
 
 
+def driver_cnv_input(wildcards):
+    if not config.get("cnv", {}).get("enabled", False):
+        return []
+    # Only wire this dependency in if CNVkit discovery actually found
+    # anything - otherwise cohort_cnv_matrix would fail with no inputs.
+    if len(get_cnv_df()) == 0:
+        return []
+    return [f"{OUTDIR}/cnv/cohort/cnv_calls.tsv"]
+
+
 rule driver_candidates:
     input:
         consensus_mafs=cohort_consensus_tsvs,
+        cnv_calls=driver_cnv_input,
     output:
         cohort_ranked=f"{OUTDIR}/drivers/cohort_ranked_drivers.tsv",
     params:
@@ -14,6 +25,7 @@ rule driver_candidates:
         filtering=config["filtering"],
         gene_panel_csv=config["gene_panel_csv"],
         baseline_mutations_tsv=config.get("baseline_mutations_tsv", ""),
+        cnv_calls_tsv=lambda wc, input: (input.cnv_calls[0] if len(input.cnv_calls) > 0 else ""),
         out_per_contrast_dir=f"{OUTDIR}/drivers/per_contrast",
     log:
         f"{OUTDIR}/logs/driver_candidates.log",
