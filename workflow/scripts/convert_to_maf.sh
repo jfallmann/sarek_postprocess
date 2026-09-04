@@ -9,13 +9,18 @@
 # Usage:
 #   convert_to_maf.sh <in_vcf> <out_maf> <tumor_id> <normal_id_or_NA> \
 #                      <ref_fasta> <build> <vep_path> <vep_data> <cache_version> <vcf2maf_pl> \
-#                      [<vcf_tumor_id_or_NA> [<vcf_normal_id_or_NA>]]
+#                      [<vcf_tumor_id_or_NA> [<vcf_normal_id_or_NA> [<vep_forks>]]]
 #
 # vcf_tumor_id/vcf_normal_id are the literal sample-column names inside the
 # VCF's genotype fields; they only differ from tumor_id/normal_id when a
 # caller hard-codes generic labels there (e.g. Strelka2's "TUMOR"/"NORMAL"
 # instead of the real sample IDs). If omitted, they default to tumor_id/
 # normal_id (i.e. no relabeling, matching vcf2maf.pl's own default).
+#
+# vep_forks sets vcf2maf.pl's --vep-forks (parallel VEP annotation
+# processes); it should match the Snakemake rule's `threads` so VEP actually
+# uses all cores allocated to the job. Defaults to 4 (vcf2maf.pl's own
+# default) if omitted.
 set -euo pipefail
 
 IN_VCF="$1"
@@ -30,8 +35,10 @@ VEP_CACHE="$9"
 V2M="${10}"
 VCF_TUMOR_ID="${11:-$TUMOR_ID}"
 VCF_NORMAL_ID="${12:-$NORMAL_ID}"
+VEP_FORKS="${13:-4}"
 [[ -n "$VCF_TUMOR_ID" && "$VCF_TUMOR_ID" != "NA" ]] || VCF_TUMOR_ID="$TUMOR_ID"
 [[ -n "$VCF_NORMAL_ID" && "$VCF_NORMAL_ID" != "NA" ]] || VCF_NORMAL_ID="$NORMAL_ID"
+[[ -n "$VEP_FORKS" ]] || VEP_FORKS=4
 
 V2M_RESOLVED="$(command -v "$V2M" 2>/dev/null || true)"
 [[ -n "$V2M_RESOLVED" ]] || { echo "ERROR: vcf2maf.pl not found (V2M=$V2M)"; exit 1; }
@@ -103,7 +110,7 @@ cmd=(perl "$V2M" --input-vcf "$in_vcf" --output-maf "$OUT_MAF" \
      --tumor-id "$TUMOR_ID" --vcf-tumor-id "$VCF_TUMOR_ID" \
      --ref-fasta "$REF_FASTA" --ncbi-build "$BUILD" \
      --vep-data "$VEP_DATA" --species homo_sapiens --cache-version "$VEP_CACHE" \
-     --vep-path "$VEP_PATH")
+     --vep-path "$VEP_PATH" --vep-forks "$VEP_FORKS")
 
 if [[ -n "$NORMAL_ID" && "$NORMAL_ID" != "NA" ]]; then
   cmd+=(--normal-id "$NORMAL_ID" --vcf-normal-id "$VCF_NORMAL_ID")

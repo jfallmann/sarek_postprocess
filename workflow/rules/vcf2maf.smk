@@ -30,7 +30,7 @@ rule vcf2maf:
         vcf2maf_pl=config["vcf2maf"]["vcf2maf_pl"],
     log:
         f"{OUTDIR}/logs/vcf2maf/{{contrast}}.{{caller}}.log",
-    threads: 2
+    threads: config.get("threads_default", 4)
     conda:
         "../envs/vcf2maf.yaml"
     shell:
@@ -38,4 +38,4 @@ rule vcf2maf:
         "{input.vcf} {output.maf} {params.tumor_id} {params.normal_id} "
         "{params.ref_fasta} {params.build} {params.vep_path} {params.vep_data} "
         "{params.cache_version} {params.vcf2maf_pl} "
-        "{params.vcf_tumor_id} {params.vcf_normal_id} > {log} 2>&1"
+        "{params.vcf_tumor_id} {params.vcf_normal_id} {threads} > {log} 2>&1"
