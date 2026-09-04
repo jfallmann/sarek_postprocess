@@ -10,7 +10,7 @@ def contrast_caller_mafs(wildcards):
 
 def contrast_maf_paths(wildcards):
     callers = contrast_caller_mafs(wildcards)
-    return [f"{OUTDIR}/maf/{wildcards.contrast}.{c}.maf" for c in callers]
+    return [f"{OUTDIR}/maf/{wildcards.contrast}.{c}.maf.gz" for c in callers]
 
 
 rule consolidate_contrast:

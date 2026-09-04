@@ -12,8 +12,18 @@ rule vcf2maf:
     input:
         vcf=lambda wc: get_contrast_caller_row(wc)["vcf_path"],
     output:
-        maf=f"{OUTDIR}/maf/{{contrast}}.{{caller}}.maf",
+        maf=f"{OUTDIR}/maf/{{contrast}}.{{caller}}.maf.gz",
     params:
+        # Pre-filter the VCF to FILTER=='PASS'|'.' records before handing it
+        # to VEP, mirroring common.R's pass_filter_maf() so the final
+        # union/consensus MAFs are unchanged - just skip the filter for any
+        # caller explicitly listed as False in qual_override_by_caller (e.g.
+        # Strelka indels, which have no reliable FILTER/QUAL).
+        pass_filter=lambda wc: (
+            "0"
+            if config.get("filtering", {}).get("qual_override_by_caller", {}).get(wc.caller) is False
+            else "1"
+        ),
         tumor_id=lambda wc: get_contrast_caller_row(wc)["tumor_id"],
         normal_id=lambda wc: (get_contrast_caller_row(wc)["normal_id"] or "NA"),
         # literal sample-column names inside the VCF's genotype fields; only
@@ -38,4 +48,4 @@ rule vcf2maf:
         "{input.vcf} {output.maf} {params.tumor_id} {params.normal_id} "
         "{params.ref_fasta} {params.build} {params.vep_path} {params.vep_data} "
         "{params.cache_version} {params.vcf2maf_pl} "
-        "{params.vcf_tumor_id} {params.vcf_normal_id} {threads} > {log} 2>&1"
+        "{params.vcf_tumor_id} {params.vcf_normal_id} {threads} {params.pass_filter} > {log} 2>&1"

@@ -9,7 +9,7 @@
 # Usage:
 #   convert_to_maf.sh <in_vcf> <out_maf> <tumor_id> <normal_id_or_NA> \
 #                      <ref_fasta> <build> <vep_path> <vep_data> <cache_version> <vcf2maf_pl> \
-#                      [<vcf_tumor_id_or_NA> [<vcf_normal_id_or_NA> [<vep_forks>]]]
+#                      [<vcf_tumor_id_or_NA> [<vcf_normal_id_or_NA> [<vep_forks> [<pass_filter>]]]]
 #
 # vcf_tumor_id/vcf_normal_id are the literal sample-column names inside the
 # VCF's genotype fields; they only differ from tumor_id/normal_id when a
@@ -21,6 +21,16 @@
 # processes); it should match the Snakemake rule's `threads` so VEP actually
 # uses all cores allocated to the job. Defaults to 4 (vcf2maf.pl's own
 # default) if omitted.
+#
+# pass_filter (0/1, default 1): if 1, drop non-PASS/non-"." records with
+# `bcftools view -f PASS,.` before running VEP, mirroring common.R's
+# pass_filter_maf() so the variants that reach VEP match what the
+# union/consensus MAFs keep anyway - this just cuts VEP's workload instead
+# of discarding those rows only after paying for their annotation. The
+# untouched original VCF is never modified, only a filtered temp copy is
+# used here, so nothing upstream is lost by setting this to 1.
+#
+# out_maf is written gzip-compressed regardless of pass_filter.
 set -euo pipefail
 
 IN_VCF="$1"
@@ -36,9 +46,11 @@ V2M="${10}"
 VCF_TUMOR_ID="${11:-$TUMOR_ID}"
 VCF_NORMAL_ID="${12:-$NORMAL_ID}"
 VEP_FORKS="${13:-4}"
+PASS_FILTER="${14:-1}"
 [[ -n "$VCF_TUMOR_ID" && "$VCF_TUMOR_ID" != "NA" ]] || VCF_TUMOR_ID="$TUMOR_ID"
 [[ -n "$VCF_NORMAL_ID" && "$VCF_NORMAL_ID" != "NA" ]] || VCF_NORMAL_ID="$NORMAL_ID"
 [[ -n "$VEP_FORKS" ]] || VEP_FORKS=4
+[[ -n "$PASS_FILTER" ]] || PASS_FILTER=1
 
 V2M_RESOLVED="$(command -v "$V2M" 2>/dev/null || true)"
 [[ -n "$V2M_RESOLVED" ]] || { echo "ERROR: vcf2maf.pl not found (V2M=$V2M)"; exit 1; }
@@ -106,7 +118,21 @@ if [[ "$IN_VCF" == *.vcf.gz ]]; then
   gunzip -c "$IN_VCF" > "$in_vcf"
 fi
 
-cmd=(perl "$V2M" --input-vcf "$in_vcf" --output-maf "$OUT_MAF" \
+if [[ "$PASS_FILTER" == "1" ]]; then
+  command -v bcftools >/dev/null 2>&1 || { echo "ERROR: bcftools not found, needed for PASS pre-filtering"; exit 1; }
+  n_before="$(grep -vc '^#' "$in_vcf" || true)"
+  filtered_vcf="$tmpdir/filtered.vcf"
+  bcftools view -f "PASS,." -O v -o "$filtered_vcf" "$in_vcf"
+  n_after="$(grep -vc '^#' "$filtered_vcf" || true)"
+  echo "[convert_to_maf] PASS pre-filter: $n_before -> $n_after records"
+  in_vcf="$filtered_vcf"
+fi
+
+# vcf2maf.pl needs an uncompressed output path; the final MAF is
+# gzip-compressed afterwards.
+tmp_maf="$tmpdir/output.maf"
+
+cmd=(perl "$V2M" --input-vcf "$in_vcf" --output-maf "$tmp_maf" \
      --tumor-id "$TUMOR_ID" --vcf-tumor-id "$VCF_TUMOR_ID" \
      --ref-fasta "$REF_FASTA" --ncbi-build "$BUILD" \
      --vep-data "$VEP_DATA" --species homo_sapiens --cache-version "$VEP_CACHE" \
@@ -118,3 +144,5 @@ fi
 
 echo "[convert_to_maf] ${cmd[*]}"
 "${cmd[@]}"
+
+gzip -c "$tmp_maf" > "$OUT_MAF"
