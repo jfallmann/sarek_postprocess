@@ -38,6 +38,7 @@ rule vcf2maf:
         vep_data=config["vcf2maf"]["vep_data"],
         cache_version=config["vcf2maf"]["cache_version"],
         vcf2maf_pl=config["vcf2maf"]["vcf2maf_pl"],
+        tmp_dir=config.get("tmp_dir", "") or "-",
     log:
         f"{OUTDIR}/logs/vcf2maf/{{contrast}}.{{caller}}.log",
     threads: config.get("threads_default", 4)
@@ -48,4 +49,5 @@ rule vcf2maf:
         "{input.vcf} {output.maf} {params.tumor_id} {params.normal_id} "
         "{params.ref_fasta} {params.build} {params.vep_path} {params.vep_data} "
         "{params.cache_version} {params.vcf2maf_pl} "
-        "{params.vcf_tumor_id} {params.vcf_normal_id} {threads} {params.pass_filter} > {log} 2>&1"
+        "{params.vcf_tumor_id} {params.vcf_normal_id} {threads} {params.pass_filter} "
+        "{params.tmp_dir} > {log} 2>&1"

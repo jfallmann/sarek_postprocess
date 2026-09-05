@@ -8,6 +8,8 @@ suppressPackageStartupMessages({
   library(VariantAnnotation)
 })
 
+source(snakemake@params[["common_r"]])
+
 vcf_path <- snakemake@input[["vcf"]]
 contrast <- snakemake@wildcards[["contrast"]]
 out_tsv  <- snakemake@output[["sv_tsv"]]
@@ -16,7 +18,7 @@ dir.create(dirname(out_tsv), showWarnings = FALSE, recursive = TRUE)
 
 if (!file.exists(vcf_path) || file.info(vcf_path)$size == 0) {
   message("Manta VCF missing/empty for ", contrast)
-  fwrite(data.table(), out_tsv, sep = "\t")
+  fwrite_gz(data.table(), out_tsv, sep = "\t")
   quit(save = "no", status = 0)
 }
 
@@ -27,7 +29,7 @@ vcf <- tryCatch(readVcf(vcf_path, genome = "GRCh38"), error = function(e) {
 
 if (is.null(vcf) || nrow(vcf) == 0) {
   message("No SVs in ", vcf_path)
-  fwrite(data.table(), out_tsv, sep = "\t")
+  fwrite_gz(data.table(), out_tsv, sep = "\t")
   quit(save = "no", status = 0)
 }
 
@@ -50,5 +52,5 @@ sv_dt <- data.table(
   }
 )
 
-fwrite(sv_dt, out_tsv, sep = "\t", quote = FALSE)
+fwrite_gz(sv_dt, out_tsv, sep = "\t", quote = FALSE)
 message("Manta SV summary for ", contrast, ": ", nrow(sv_dt), " records -> ", out_tsv)

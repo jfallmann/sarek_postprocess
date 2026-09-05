@@ -10,7 +10,9 @@ rule summarize_cnvkit:
     input:
         cns=lambda wc: get_cnv_row(wc)["cns_path"],
     output:
-        gene_tsv=f"{OUTDIR}/cnv/{{contrast}}.cnvkit_genes.tsv",
+        gene_tsv=f"{OUTDIR}/cnv/{{contrast}}.cnvkit_genes.tsv.gz",
+    params:
+        common_r=f"{workflow.basedir}/scripts/common.R",
     log:
         f"{OUTDIR}/logs/cnvkit/{{contrast}}.log",
     conda:
@@ -24,15 +26,15 @@ def cnv_contrasts(wildcards):
 
 
 def cnv_gene_tsvs(wildcards):
-    return [f"{OUTDIR}/cnv/{c}.cnvkit_genes.tsv" for c in cnv_contrasts(wildcards)]
+    return [f"{OUTDIR}/cnv/{c}.cnvkit_genes.tsv.gz" for c in cnv_contrasts(wildcards)]
 
 
 rule cohort_cnv_matrix:
     input:
         gene_tsvs=cnv_gene_tsvs,
     output:
-        matrix_tsv=f"{OUTDIR}/cnv/cohort/cnv_matrix.tsv",
-        calls_tsv=f"{OUTDIR}/cnv/cohort/cnv_calls.tsv",
+        matrix_tsv=f"{OUTDIR}/cnv/cohort/cnv_matrix.tsv.gz",
+        calls_tsv=f"{OUTDIR}/cnv/cohort/cnv_calls.tsv.gz",
         heatmap_pdf=f"{OUTDIR}/cnv/cohort/cnv_heatmap.pdf",
     params:
         common_r=f"{workflow.basedir}/scripts/common.R",

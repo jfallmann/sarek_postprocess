@@ -17,8 +17,8 @@ rule consolidate_contrast:
     input:
         mafs=contrast_maf_paths,
     output:
-        union_maf=f"{OUTDIR}/maf_consolidated/{{contrast}}.union.tsv",
-        consensus_maf=f"{OUTDIR}/maf_consolidated/{{contrast}}.consensus.tsv",
+        union_maf=f"{OUTDIR}/maf_consolidated/{{contrast}}.union.tsv.gz",
+        consensus_maf=f"{OUTDIR}/maf_consolidated/{{contrast}}.consensus.tsv.gz",
     params:
         common_r=f"{workflow.basedir}/scripts/common.R",
         callers=contrast_caller_mafs,
@@ -37,7 +37,7 @@ def all_contrasts(wildcards):
 
 
 def cohort_union_tsvs(wildcards):
-    return [f"{OUTDIR}/maf_consolidated/{c}.union.tsv" for c in all_contrasts(wildcards)]
+    return [f"{OUTDIR}/maf_consolidated/{c}.union.tsv.gz" for c in all_contrasts(wildcards)]
 
 
 rule build_cohort_union:

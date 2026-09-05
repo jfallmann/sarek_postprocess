@@ -11,6 +11,8 @@ suppressPackageStartupMessages({
   library(BSgenome)
 })
 
+source(snakemake@params[["common_r"]])
+
 vcf_paths   <- unlist(snakemake@input[["mutect2_vcfs"]])
 contrasts   <- unlist(snakemake@params[["contrasts"]])
 genome_pkg  <- snakemake@params[["genome_package"]]
@@ -63,7 +65,7 @@ signatures <- tryCatch(
 
 if (is.null(signatures)) {
   message("Reference signature set unavailable; writing raw mutation matrix only")
-  fwrite(as.data.table(mut_mat, keep.rownames = "context"), file.path(out_dir, "mutation_matrix.tsv"), sep = "\t")
+  fwrite_gz(as.data.table(mut_mat, keep.rownames = "context"), file.path(out_dir, "mutation_matrix.tsv.gz"), sep = "\t")
   file.create(done_marker)
   quit(save = "no", status = 0)
 }
@@ -71,8 +73,8 @@ if (is.null(signatures)) {
 fit_res <- fit_to_signatures(mut_mat, signatures)
 contribution <- fit_res$contribution
 
-fwrite(as.data.table(contribution, keep.rownames = "signature"),
-       file.path(out_dir, "signature_contributions.tsv"), sep = "\t")
+fwrite_gz(as.data.table(contribution, keep.rownames = "signature"),
+       file.path(out_dir, "signature_contributions.tsv.gz"), sep = "\t")
 
 pdf(file.path(out_dir, "signature_contribution_heatmap.pdf"), width = 10, height = 8)
 print(plot_contribution_heatmap(contribution, cluster_samples = FALSE))

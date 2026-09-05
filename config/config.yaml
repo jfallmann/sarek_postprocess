@@ -16,6 +16,13 @@ sarek_outdir: "/path/to/sarek/results"
 # Output directory for this postprocessing run.
 outdir: "results"
 
+# Scratch directory for large intermediate files (decompressed VCFs/FASTA,
+# PASS-filtered VCFs, uncompressed MAFs before gzip) - used instead of the
+# system default (/tmp, or $TMPDIR if set) when jobs need more scratch space
+# than that partition has (e.g. whole-genome VCFs/FASTA on a small /tmp).
+# Leave empty ("") to use the system default.
+tmp_dir: ""
+
 # Genome build used by the Sarek run (must match VEP cache / reference used).
 genome_build: "GRCh38"
 

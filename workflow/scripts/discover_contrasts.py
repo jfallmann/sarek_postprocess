@@ -27,12 +27,13 @@ a second output file (--cnv-out).
 
 Usage:
     discover_contrasts.py --sarek-outdir DIR --samplesheet CSV \
-        --callers mutect2,strelka --out contrasts.tsv --cnv-out cnv_contrasts.tsv \
+        --callers mutect2,strelka --out contrasts.tsv.gz --cnv-out cnv_contrasts.tsv.gz \
         [--mutect2-dir DIR] [--strelka-dir DIR] [--manta-dir DIR] [--cnvkit-dir DIR] \
         [--sample-subset-regex REGEX]
 """
 import argparse
 import csv
+import gzip
 import os
 import re
 import subprocess
@@ -333,7 +334,7 @@ def main():
         print("WARNING: no contrasts discovered - check --sarek-outdir and --callers", file=sys.stderr)
 
     Path(args.out).parent.mkdir(parents=True, exist_ok=True)
-    with open(args.out, "w", newline="") as fh:
+    with gzip.open(args.out, "wt", newline="") as fh:
         fieldnames = ["contrast", "caller", "type", "tumor_id", "normal_id", "vcf_tumor_id", "vcf_normal_id",
                       "vcf_path", "patient", "sex"]
         writer = csv.DictWriter(fh, fieldnames=fieldnames, delimiter="\t")
@@ -358,7 +359,7 @@ def main():
             })
 
         Path(args.cnv_out).parent.mkdir(parents=True, exist_ok=True)
-        with open(args.cnv_out, "w", newline="") as fh:
+        with gzip.open(args.cnv_out, "wt", newline="") as fh:
             fieldnames = ["contrast", "tumor_id", "cns_path", "genemetrics_path"]
             writer = csv.DictWriter(fh, fieldnames=fieldnames, delimiter="\t")
             writer.writeheader()

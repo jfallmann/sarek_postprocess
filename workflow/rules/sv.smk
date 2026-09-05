@@ -13,7 +13,9 @@ rule summarize_manta_sv:
     input:
         vcf=lambda wc: get_manta_row(wc)["vcf_path"],
     output:
-        sv_tsv=f"{OUTDIR}/sv/{{contrast}}.manta_sv.tsv",
+        sv_tsv=f"{OUTDIR}/sv/{{contrast}}.manta_sv.tsv.gz",
+    params:
+        common_r=f"{workflow.basedir}/scripts/common.R",
     log:
         f"{OUTDIR}/logs/manta/{{contrast}}.log",
     conda:
@@ -28,4 +30,4 @@ def manta_contrasts(wildcards):
 
 
 def all_manta_sv_tsvs(wildcards):
-    return [f"{OUTDIR}/sv/{c}.manta_sv.tsv" for c in manta_contrasts(wildcards)]
+    return [f"{OUTDIR}/sv/{c}.manta_sv.tsv.gz" for c in manta_contrasts(wildcards)]

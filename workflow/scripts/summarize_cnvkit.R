@@ -12,6 +12,8 @@ suppressPackageStartupMessages({
   library(data.table)
 })
 
+source(snakemake@params[["common_r"]])
+
 cns_path <- snakemake@input[["cns"]]
 contrast <- snakemake@wildcards[["contrast"]]
 out_tsv  <- snakemake@output[["gene_tsv"]]
@@ -20,7 +22,7 @@ dir.create(dirname(out_tsv), showWarnings = FALSE, recursive = TRUE)
 
 if (!file.exists(cns_path) || file.info(cns_path)$size == 0) {
   message("CNVkit segment file missing/empty for ", contrast, ": ", cns_path)
-  fwrite(data.table(), out_tsv, sep = "\t")
+  fwrite_gz(data.table(), out_tsv, sep = "\t")
   quit(save = "no", status = 0)
 }
 
@@ -28,7 +30,7 @@ cns <- fread(cns_path)
 
 if (!"gene" %in% names(cns) || nrow(cns) == 0) {
   message("No 'gene' column or no rows in ", cns_path, "; cannot summarize CNVkit output for ", contrast)
-  fwrite(data.table(), out_tsv, sep = "\t")
+  fwrite_gz(data.table(), out_tsv, sep = "\t")
   quit(save = "no", status = 0)
 }
 
@@ -42,7 +44,7 @@ expanded <- expanded[!Hugo_Symbol %in% c("", "-", "Background", "Antitarget")]
 
 if (nrow(expanded) == 0) {
   message("No gene-annotated segments remain for ", contrast)
-  fwrite(data.table(), out_tsv, sep = "\t")
+  fwrite_gz(data.table(), out_tsv, sep = "\t")
   quit(save = "no", status = 0)
 }
 
@@ -56,5 +58,5 @@ gene_dt <- expanded[, .(
 gene_dt[, Contrast := contrast]
 setorder(gene_dt, Hugo_Symbol)
 
-fwrite(gene_dt, out_tsv, sep = "\t", quote = FALSE)
+fwrite_gz(gene_dt, out_tsv, sep = "\t", quote = FALSE)
 message("CNVkit gene summary for ", contrast, ": ", nrow(gene_dt), " genes -> ", out_tsv)

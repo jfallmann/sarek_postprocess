@@ -2,8 +2,8 @@ checkpoint discover_contrasts:
     input:
         samplesheet=config["samplesheet"],
     output:
-        tsv=f"{OUTDIR}/contrasts.tsv",
-        cnv_tsv=f"{OUTDIR}/cnv_contrasts.tsv",
+        tsv=f"{OUTDIR}/contrasts.tsv.gz",
+        cnv_tsv=f"{OUTDIR}/cnv_contrasts.tsv.gz",
     params:
         sarek_outdir=config["sarek_outdir"],
         callers=",".join(config["callers"]),

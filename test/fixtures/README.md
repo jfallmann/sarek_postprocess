@@ -15,7 +15,7 @@ Smoke test:
 python3 workflow/scripts/discover_contrasts.py \
   --sarek-outdir test/fixtures/fake_sarek_output \
   --samplesheet test/fixtures/fake_samplesheet.csv \
-  --callers mutect2,strelka --include-manta --out /tmp/contrasts.tsv
+  --callers mutect2,strelka --include-manta --out /tmp/contrasts.tsv.gz
 ```
 
 (`bcftools` is required to resolve tumor/normal sample IDs from the VCF

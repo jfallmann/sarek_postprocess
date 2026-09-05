@@ -44,7 +44,7 @@ include: "rules/actionability.smk"
 def get_all_targets(wildcards):
     targets = [
         f"{OUTDIR}/oncoplots/cohort/.done",
-        f"{OUTDIR}/drivers/cohort_ranked_drivers.tsv",
+        f"{OUTDIR}/drivers/cohort_ranked_drivers.tsv.gz",
     ]
     if config.get("signatures", {}).get("enabled", False):
         targets.append(f"{OUTDIR}/signatures/cohort/.done")
@@ -53,7 +53,7 @@ def get_all_targets(wildcards):
     if config.get("cnv", {}).get("enabled", False):
         targets.append(f"{OUTDIR}/cnv/cohort/cnv_heatmap.pdf")
     if config.get("actionability", {}).get("enabled", False):
-        targets.append(f"{OUTDIR}/actionability/actionability_report.tsv")
+        targets.append(f"{OUTDIR}/actionability/actionability_report.tsv.gz")
     return targets
 
 

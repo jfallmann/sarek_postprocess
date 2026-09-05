@@ -9,6 +9,8 @@ suppressPackageStartupMessages({
   library(data.table)
 })
 
+source(snakemake@params[["common_r"]])
+
 cohort_ranked_tsv <- snakemake@input[["cohort_ranked"]]
 cgc_tsv    <- snakemake@params[["cancer_gene_census_tsv"]]
 oncokb_tsv <- snakemake@params[["oncokb_gene_list_tsv"]]
@@ -20,7 +22,7 @@ dir.create(dirname(out_tsv), showWarnings = FALSE, recursive = TRUE)
 ranked <- fread(cohort_ranked_tsv)
 if (nrow(ranked) == 0) {
   message("Cohort ranked driver list is empty; writing empty actionability report")
-  fwrite(ranked, out_tsv, sep = "\t")
+  fwrite_gz(ranked, out_tsv, sep = "\t")
   quit(save = "no", status = 0)
 }
 
@@ -48,5 +50,5 @@ ranked[, In_CIViC   := Hugo_Symbol %in% civic_genes]
 ranked[, Actionability_Sources := In_CGC + In_OncoKB + In_CIViC]
 setorder(ranked, -Actionability_Sources, -Score)
 
-fwrite(ranked, out_tsv, sep = "\t", quote = FALSE)
+fwrite_gz(ranked, out_tsv, sep = "\t", quote = FALSE)
 message("Actionability report (", nrow(ranked), " genes) written to ", out_tsv)

@@ -9,7 +9,7 @@
 # Usage:
 #   convert_to_maf.sh <in_vcf> <out_maf> <tumor_id> <normal_id_or_NA> \
 #                      <ref_fasta> <build> <vep_path> <vep_data> <cache_version> <vcf2maf_pl> \
-#                      [<vcf_tumor_id_or_NA> [<vcf_normal_id_or_NA> [<vep_forks> [<pass_filter>]]]]
+#                      [<vcf_tumor_id_or_NA> [<vcf_normal_id_or_NA> [<vep_forks> [<pass_filter> [<tmp_dir_base>]]]]]
 #
 # vcf_tumor_id/vcf_normal_id are the literal sample-column names inside the
 # VCF's genotype fields; they only differ from tumor_id/normal_id when a
@@ -31,6 +31,12 @@
 # used here, so nothing upstream is lost by setting this to 1.
 #
 # out_maf is written gzip-compressed regardless of pass_filter.
+#
+# tmp_dir_base ("-" or omitted to use the system default, i.e. mktemp's own
+# $TMPDIR/tmp fallback): base directory under which this run's scratch dir
+# is created, for sites where the default tmp partition is too small for
+# decompressed whole-genome VCFs/FASTA (set config.yaml's top-level
+# `tmp_dir` rather than editing this script directly).
 set -euo pipefail
 
 IN_VCF="$1"
@@ -47,10 +53,12 @@ VCF_TUMOR_ID="${11:-$TUMOR_ID}"
 VCF_NORMAL_ID="${12:-$NORMAL_ID}"
 VEP_FORKS="${13:-4}"
 PASS_FILTER="${14:-1}"
+TMP_DIR_BASE="${15:--}"
 [[ -n "$VCF_TUMOR_ID" && "$VCF_TUMOR_ID" != "NA" ]] || VCF_TUMOR_ID="$TUMOR_ID"
 [[ -n "$VCF_NORMAL_ID" && "$VCF_NORMAL_ID" != "NA" ]] || VCF_NORMAL_ID="$NORMAL_ID"
 [[ -n "$VEP_FORKS" ]] || VEP_FORKS=4
 [[ -n "$PASS_FILTER" ]] || PASS_FILTER=1
+[[ -n "$TMP_DIR_BASE" ]] || TMP_DIR_BASE="-"
 
 V2M_RESOLVED="$(command -v "$V2M" 2>/dev/null || true)"
 [[ -n "$V2M_RESOLVED" ]] || { echo "ERROR: vcf2maf.pl not found (V2M=$V2M)"; exit 1; }
@@ -83,7 +91,12 @@ fi
 [[ -n "$TUMOR_ID" ]] || { echo "ERROR: TUMOR_ID is empty - discover_contrasts.py could not resolve it"; exit 1; }
 
 mkdir -p "$(dirname "$OUT_MAF")"
-tmpdir="$(mktemp -d)"
+if [[ "$TMP_DIR_BASE" == "-" ]]; then
+  tmpdir="$(mktemp -d)"
+else
+  [[ -d "$TMP_DIR_BASE" ]] || { echo "ERROR: tmp_dir '$TMP_DIR_BASE' does not exist"; exit 1; }
+  tmpdir="$(mktemp -p "$TMP_DIR_BASE" -d)"
+fi
 trap 'rm -rf "$tmpdir"' EXIT
 
 # vcf2maf requires an uncompressed, samtools-faidx-indexed reference FASTA.

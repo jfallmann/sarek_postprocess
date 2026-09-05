@@ -8,6 +8,29 @@ suppressPackageStartupMessages({
 
 `%||%` <- function(a, b) if (is.null(a)) b else a
 
+#' Write a data.table to a gzip-compressed .tsv.gz file.
+#'
+#' data.table's fwrite() cannot write to connections, so this writes a plain
+#' temp file next to the target, gzips it into place, and removes the temp.
+#' fread() transparently reads .gz, so downstream consumers need no changes.
+fwrite_gz <- function(dt, path, ...) {
+  tmp <- tempfile(
+    pattern = paste0(basename(sub("\\.gz$", "", path)), "."),
+    tmpdir = dirname(path)
+  )
+  on.exit(if (file.exists(tmp)) unlink(tmp), add = TRUE)
+  fwrite(dt, tmp, ...)
+  if (requireNamespace("R.utils", quietly = TRUE)) {
+    R.utils::gzip(tmp, destname = path, remove = TRUE)
+  } else {
+    system2("gzip", c("-f", shQuote(tmp)))
+    stopifnot(file.exists(paste0(tmp, ".gz")))
+    if (file.exists(path)) unlink(path)
+    file.rename(paste0(tmp, ".gz"), path)
+  }
+  invisible(path)
+}
+
 #' PASS-filter a maftools MAF object, honouring a per-caller override list
 #' (e.g. Strelka indels have no reliable FILTER/QUAL and should be skipped).
 pass_filter_maf <- function(maf_obj, caller, qual_override_by_caller = list()) {

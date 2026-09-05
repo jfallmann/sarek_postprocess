@@ -54,14 +54,14 @@ dir.create(dirname(out_consensus), showWarnings = FALSE, recursive = TRUE)
 
 if (length(dt_list) == 0) {
   message("No variants remain for contrast ", contrast, " after PASS filtering; writing empty outputs")
-  fwrite(data.table(), out_union, sep = "\t")
-  fwrite(data.table(), out_consensus, sep = "\t")
+  fwrite_gz(data.table(), out_union, sep = "\t")
+  fwrite_gz(data.table(), out_consensus, sep = "\t")
   quit(save = "no", status = 0)
 }
 
 union_dt <- rbindlist(dt_list, use.names = TRUE, fill = TRUE)
 union_dt <- apply_quality_filters(union_dt, filtering)
-fwrite(union_dt, out_union, sep = "\t", quote = FALSE)
+fwrite_gz(union_dt, out_union, sep = "\t", quote = FALSE)
 
 key_cols <- c("Chromosome", "Start_Position", "End_Position", "Tumor_Sample_Barcode", "Hugo_Symbol")
 key_cols <- intersect(key_cols, names(union_dt))
@@ -76,6 +76,6 @@ if (length(key_cols) == length(c("Chromosome", "Start_Position", "End_Position",
   consensus_dt <- union_dt
 }
 
-fwrite(consensus_dt, out_consensus, sep = "\t", quote = FALSE)
+fwrite_gz(consensus_dt, out_consensus, sep = "\t", quote = FALSE)
 
 message("Contrast ", contrast, ": union=", nrow(union_dt), " consensus=", nrow(consensus_dt))

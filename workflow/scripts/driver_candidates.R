@@ -57,7 +57,7 @@ dt_list <- Filter(Negate(is.null), dt_list)
 
 if (length(dt_list) == 0) {
   message("No consensus variants remain across any contrast; writing empty cohort ranking")
-  fwrite(data.table(), out_cohort_ranked, sep = "\t")
+  fwrite_gz(data.table(), out_cohort_ranked, sep = "\t")
   quit(save = "no", status = 0)
 }
 
@@ -67,9 +67,9 @@ all_dt <- rbindlist(dt_list, use.names = TRUE, fill = TRUE)
 for (contrast in unique(all_dt$Contrast)) {
   sub <- all_dt[Contrast == contrast]
   sub[, In_Gene_Panel := Hugo_Symbol %in% gene_panel]
-  fwrite(sub[order(-In_Gene_Panel, Hugo_Symbol)],
-         file.path(out_per_contrast_dir, paste0(contrast, ".candidate_drivers.tsv")),
-         sep = "\t", quote = FALSE)
+  fwrite_gz(sub[order(-In_Gene_Panel, Hugo_Symbol)],
+            file.path(out_per_contrast_dir, paste0(contrast, ".candidate_drivers.tsv.gz")),
+            sep = "\t", quote = FALSE)
 }
 
 ## Cohort-wide recurrence ranking -------------------------------------------
@@ -106,7 +106,7 @@ if (!is.null(cnv_calls_tsv) && nzchar(cnv_calls_tsv) && file.exists(cnv_calls_ts
 
 setorder(recur, -Score, -n_contrasts, Hugo_Symbol)
 
-fwrite(recur, out_cohort_ranked, sep = "\t", quote = FALSE)
+fwrite_gz(recur, out_cohort_ranked, sep = "\t", quote = FALSE)
 message("Cohort driver ranking (", nrow(recur), " genes) written to ", out_cohort_ranked)
 
 ## Optional exploratory mafCompare vs pooled sensitive contrasts -------------
@@ -127,8 +127,8 @@ if (length(sensitive_contrasts) > 0) {
       }
     )
     if (is.null(cmp)) next
-    fwrite(cmp$results, file.path(out_per_contrast_dir, paste0(rc, ".vs_sensitive_pool.mafCompare.tsv")),
-           sep = "\t", quote = FALSE)
+    fwrite_gz(cmp$results, file.path(out_per_contrast_dir, paste0(rc, ".vs_sensitive_pool.mafCompare.tsv.gz")),
+              sep = "\t", quote = FALSE)
     pdf_path <- file.path(out_per_contrast_dir, paste0(rc, ".vs_sensitive_pool.forestplot.pdf"))
     tryCatch({
       pdf(pdf_path, width = 8, height = 8)

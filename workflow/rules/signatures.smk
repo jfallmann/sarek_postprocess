@@ -22,6 +22,7 @@ rule mutational_signatures:
         genome_package=config["signatures"]["genome_package"],
         reference_set=config["signatures"]["reference_set"],
         out_dir=f"{OUTDIR}/signatures/cohort",
+        common_r=f"{workflow.basedir}/scripts/common.R",
     log:
         f"{OUTDIR}/logs/mutational_signatures.log",
     conda:

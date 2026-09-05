@@ -1,5 +1,5 @@
 def cohort_consensus_tsvs(wildcards):
-    return [f"{OUTDIR}/maf_consolidated/{c}.consensus.tsv" for c in all_contrasts(wildcards)]
+    return [f"{OUTDIR}/maf_consolidated/{c}.consensus.tsv.gz" for c in all_contrasts(wildcards)]
 
 
 def driver_cnv_input(wildcards):
@@ -9,7 +9,7 @@ def driver_cnv_input(wildcards):
     # anything - otherwise cohort_cnv_matrix would fail with no inputs.
     if len(get_cnv_df()) == 0:
         return []
-    return [f"{OUTDIR}/cnv/cohort/cnv_calls.tsv"]
+    return [f"{OUTDIR}/cnv/cohort/cnv_calls.tsv.gz"]
 
 
 rule driver_candidates:
@@ -17,7 +17,7 @@ rule driver_candidates:
         consensus_mafs=cohort_consensus_tsvs,
         cnv_calls=driver_cnv_input,
     output:
-        cohort_ranked=f"{OUTDIR}/drivers/cohort_ranked_drivers.tsv",
+        cohort_ranked=f"{OUTDIR}/drivers/cohort_ranked_drivers.tsv.gz",
     params:
         common_r=f"{workflow.basedir}/scripts/common.R",
         contrasts=all_contrasts,

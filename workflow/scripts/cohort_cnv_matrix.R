@@ -33,8 +33,8 @@ dt_list <- Filter(Negate(is.null), dt_list)
 
 if (length(dt_list) == 0) {
   message("No CNVkit gene summaries available; writing empty CNV matrix/calls")
-  fwrite(data.table(), out_matrix, sep = "\t")
-  fwrite(data.table(), out_calls, sep = "\t")
+  fwrite_gz(data.table(), out_matrix, sep = "\t")
+  fwrite_gz(data.table(), out_calls, sep = "\t")
   pdf(out_heatmap); plot.new(); text(0.5, 0.5, "No CNV data available"); dev.off()
   quit(save = "no", status = 0)
 }
@@ -44,7 +44,7 @@ all_dt <- rbindlist(dt_list, use.names = TRUE, fill = TRUE)
 ## Calls table (used by driver_candidates.R) - one row per gene x contrast --
 all_dt[, Call := fifelse(log2_weighted >= min_gain, "gain",
                    fifelse(log2_weighted <= min_loss, "loss", "neutral"))]
-fwrite(all_dt, out_calls, sep = "\t", quote = FALSE)
+fwrite_gz(all_dt, out_calls, sep = "\t", quote = FALSE)
 
 ## Wide matrix + heatmap, restricted to a gene panel -------------------------
 panel <- read_gene_panel(if (nzchar(gene_panel_csv)) gene_panel_csv else snakemake@params[["default_gene_panel_csv"]])
@@ -61,7 +61,7 @@ mat[, Hugo_Symbol := NULL]
 mat_m <- as.matrix(mat)
 rownames(mat_m) <- gene_names
 
-fwrite(data.table(Hugo_Symbol = gene_names, mat), out_matrix, sep = "\t", quote = FALSE)
+fwrite_gz(data.table(Hugo_Symbol = gene_names, mat), out_matrix, sep = "\t", quote = FALSE)
 
 if (nrow(mat_m) >= 1 && ncol(mat_m) >= 1) {
   col_fun <- colorRamp2(c(min(mat_m, na.rm = TRUE), 0, max(mat_m, na.rm = TRUE)),
