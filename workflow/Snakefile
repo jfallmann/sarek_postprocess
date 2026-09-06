@@ -42,10 +42,10 @@ include: "rules/actionability.smk"
 
 
 def get_all_targets(wildcards):
-    targets = [
-        f"{OUTDIR}/oncoplots/cohort/.done",
-        f"{OUTDIR}/drivers/cohort_ranked_drivers.tsv.gz",
-    ]
+    targets = []
+    for vcset in VCSETS:
+        targets.append(f"{OUTDIR}/oncoplots/cohort/{vcset}/.done")
+        targets.append(f"{OUTDIR}/drivers/{vcset}/cohort_ranked_drivers.tsv.gz")
     if config.get("signatures", {}).get("enabled", False):
         targets.append(f"{OUTDIR}/signatures/cohort/.done")
     if config.get("sv_analysis", {}).get("enabled", False):

@@ -22,18 +22,21 @@ source(snakemake@params[["common_r"]])
 maf_paths   <- unlist(snakemake@input[["mafs"]])
 callers     <- unlist(snakemake@params[["callers"]])
 contrast    <- snakemake@wildcards[["contrast"]]
+vcset       <- snakemake@wildcards[["vcset"]]
 filtering   <- snakemake@params[["filtering"]]
 out_union     <- snakemake@output[["union_maf"]]
 out_consensus <- snakemake@output[["consensus_maf"]]
 
 stopifnot(length(maf_paths) == length(callers))
 
+vc_nonsyn <- resolve_vc_nonsyn(vcset, filtering)
+
 read_one <- function(path, caller) {
   if (!file.exists(path) || file.info(path)$size == 0) {
     message("Skipping empty/missing MAF: ", path)
     return(NULL)
   }
-  m <- tryCatch(read.maf(maf = path, verbose = FALSE), error = function(e) {
+  m <- tryCatch(read.maf(maf = path, verbose = FALSE, vc_nonSyn = vc_nonsyn), error = function(e) {
     message("read.maf failed for ", path, ": ", e$message)
     NULL
   })

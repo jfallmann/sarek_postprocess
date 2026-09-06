@@ -136,3 +136,32 @@ impactful_variant_classes <- c(
   "Translation_Start_Site", "Start_Codon_Del", "Start_Codon_Ins", "Start_Codon_SNP",
   "De_novo_Start_InFrame", "De_novo_Start_OutOfFrame"
 )
+
+#' Standard, most-stringent maftools "non-synonymous" set - protein-coding
+#' variants only. This mirrors maftools::read.maf()'s own built-in default
+#' (it is not actually exported as `vc.nonSyn`, hence duplicated here) and is
+#' used for the "protein_coding" output track.
+protein_coding_vc_nonsyn <- c(
+  "Frame_Shift_Del", "Frame_Shift_Ins", "Splice_Site", "Translation_Start_Site",
+  "Nonsense_Mutation", "Nonstop_Mutation", "In_Frame_Del", "In_Frame_Ins",
+  "Missense_Mutation"
+)
+
+#' Less-stringent default for the "custom" output track: protein-coding plus
+#' splice-region and UTR/non-coding classes that are otherwise silently
+#' dropped by maftools' default vc_nonSyn filtering (relevant for WGS, where
+#' most calls fall outside strict coding exons). Overridable via
+#' filtering$vc_nonsyn_custom in config.yaml.
+default_custom_vc_nonsyn <- c(
+  protein_coding_vc_nonsyn,
+  "Splice_Region", "5'UTR", "3'UTR", "RNA", "Intron",
+  "De_novo_Start_InFrame", "De_novo_Start_OutOfFrame",
+  "Start_Codon_SNP", "Start_Codon_Ins", "Start_Codon_Del"
+)
+
+#' Resolve the Variant_Classification set to keep for a given output track
+#' ("custom" or "protein_coding"), honouring filtering$vc_nonsyn_custom.
+resolve_vc_nonsyn <- function(vcset, filtering_cfg) {
+  if (identical(vcset, "protein_coding")) return(protein_coding_vc_nonsyn)
+  unlist(filtering_cfg$vc_nonsyn_custom %||% default_custom_vc_nonsyn)
+}

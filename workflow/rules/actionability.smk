@@ -1,6 +1,8 @@
 rule actionability_report:
     input:
-        cohort_ranked=f"{OUTDIR}/drivers/cohort_ranked_drivers.tsv.gz",
+        # Actionability is based on the more inclusive "custom" driver track;
+        # use the "protein_coding" track's output if you want the strict one.
+        cohort_ranked=f"{OUTDIR}/drivers/custom/cohort_ranked_drivers.tsv.gz",
     output:
         report=f"{OUTDIR}/actionability/actionability_report.tsv.gz",
     params:

@@ -92,6 +92,33 @@ filtering:
   max_gnomad_af: 0.001          # uses gnomADe_AF/gnomADg_AF from VEP cache (--everything)
   consensus_min_callers: 2      # variant must be called by >= N callers to be a "candidate driver"
   exclude_gene_regex: "(?i)^MUC|^TTN|^HLA|^NEB|^OBSCN|^USH2A"
+  # Variant_Classification values kept for the "custom" output track (union/
+  # consensus MAFs, cohort union, oncoplots, drivers). Everything else is a
+  # second, always-produced "protein_coding" track using maftools' own
+  # stringent default (missense/nonsense/frameshift/splice-site/in-frame
+  # indel/etc. only) - not configurable, for a reproducible strict baseline.
+  # Relevant for WGS, where most calls are intronic/intergenic/UTR and would
+  # otherwise be silently dropped before any of the filters above even run.
+  vc_nonsyn_custom:
+    - Frame_Shift_Del
+    - Frame_Shift_Ins
+    - Splice_Site
+    - Splice_Region
+    - Translation_Start_Site
+    - Nonsense_Mutation
+    - Nonstop_Mutation
+    - In_Frame_Del
+    - In_Frame_Ins
+    - Missense_Mutation
+    - "5'UTR"
+    - "3'UTR"
+    - RNA
+    - Intron
+    - De_novo_Start_InFrame
+    - De_novo_Start_OutOfFrame
+    - Start_Codon_SNP
+    - Start_Codon_Ins
+    - Start_Codon_Del
 
 # Optional: TSV of known baseline mutations for the parental/reference line
 # (e.g. a COSMIC Cell Lines Project export) used to strip out pre-existing

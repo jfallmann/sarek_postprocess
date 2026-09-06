@@ -9,13 +9,24 @@ suppressPackageStartupMessages({
   library(maftools)
 })
 
+source(snakemake@params[["common_r"]])
+
 union_tsvs   <- unlist(snakemake@input[["union_tsvs"]])
 contrasts    <- unlist(snakemake@params[["contrasts"]])
+vcset        <- snakemake@wildcards[["vcset"]]
+filtering    <- snakemake@params[["filtering"]]
 subset_regex <- snakemake@params[["sample_subset_regex"]]
 out_maflist  <- snakemake@output[["maf_list_rds"]]
 out_union    <- snakemake@output[["union_rds"]]
 
 stopifnot(length(union_tsvs) == length(contrasts))
+
+## The per-contrast union TSVs were already filtered to this vcset's
+## Variant_Classification set by consolidate_mafs.R; re-apply the same set
+## here (rather than maftools' own stringent default) so read.maf() doesn't
+## silently re-drop the very classes (e.g. Splice_Region/UTR/Intron) the
+## "custom" track was built to keep.
+vc_nonsyn <- resolve_vc_nonsyn(vcset, filtering)
 
 if (!is.null(subset_regex) && nzchar(subset_regex)) {
   keep <- grepl(subset_regex, contrasts)
@@ -27,7 +38,7 @@ read_contrast_maf <- function(path, contrast) {
   if (!file.exists(path) || file.info(path)$size == 0) return(NULL)
   dt <- tryCatch(fread(path), error = function(e) NULL)
   if (is.null(dt) || nrow(dt) == 0) return(NULL)
-  m <- tryCatch(read.maf(maf = dt, verbose = FALSE, vc_nonSyn = maftools::vc.nonSyn), error = function(e) {
+  m <- tryCatch(read.maf(maf = dt, verbose = FALSE, vc_nonSyn = vc_nonsyn), error = function(e) {
     message("read.maf failed for contrast ", contrast, ": ", e$message)
     NULL
   })

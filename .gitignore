@@ -223,3 +223,4 @@ results/
 *.rds.gz
 config/*.local.yaml
 __pycache__/
+.abacusai

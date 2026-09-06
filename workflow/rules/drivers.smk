@@ -1,5 +1,5 @@
 def cohort_consensus_tsvs(wildcards):
-    return [f"{OUTDIR}/maf_consolidated/{c}.consensus.tsv.gz" for c in all_contrasts(wildcards)]
+    return [f"{OUTDIR}/maf_consolidated/{wildcards.vcset}/{c}.consensus.tsv.gz" for c in all_contrasts(wildcards)]
 
 
 def driver_cnv_input(wildcards):
@@ -17,7 +17,7 @@ rule driver_candidates:
         consensus_mafs=cohort_consensus_tsvs,
         cnv_calls=driver_cnv_input,
     output:
-        cohort_ranked=f"{OUTDIR}/drivers/cohort_ranked_drivers.tsv.gz",
+        cohort_ranked=f"{OUTDIR}/drivers/{{vcset}}/cohort_ranked_drivers.tsv.gz",
     params:
         common_r=f"{workflow.basedir}/scripts/common.R",
         contrasts=all_contrasts,
@@ -26,9 +26,9 @@ rule driver_candidates:
         gene_panel_csv=config["gene_panel_csv"],
         baseline_mutations_tsv=config.get("baseline_mutations_tsv", ""),
         cnv_calls_tsv=lambda wc, input: (input.cnv_calls[0] if len(input.cnv_calls) > 0 else ""),
-        out_per_contrast_dir=f"{OUTDIR}/drivers/per_contrast",
+        out_per_contrast_dir=f"{OUTDIR}/drivers/{{vcset}}/per_contrast",
     log:
-        f"{OUTDIR}/logs/driver_candidates.log",
+        f"{OUTDIR}/logs/driver_candidates/{{vcset}}.log",
     conda:
         "../envs/r_env.yaml"
     script:
