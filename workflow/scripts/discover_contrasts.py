@@ -145,6 +145,19 @@ def resolve_tumor_normal(contrast, samples, sample_meta):
         vcf_n = next(s for s in samples if s.lower() == "normal")
         return tumor_tok, normal_tok, vcf_t, vcf_n
 
+    # t_id/n_id are the literal VCF genotype-column names (needed to select
+    # the right sample when calling vcf2maf.pl); tumor_tok/normal_tok stay
+    # the report IDs written into the MAF's Tumor_Sample_Barcode. Keeping
+    # these separate (instead of returning the matched VCF column name for
+    # both, as a previous version of this function did) is required for
+    # cross-caller consistency: e.g. Mutect2 VCFs commonly carry
+    # library-suffixed genotype-column names like "<contrast>_bn_<tumor>_1"
+    # while Strelka's genotype columns are the plain contrast tokens or the
+    # GENERIC_VCF_SAMPLE_LABELS above - if the raw VCF column name leaked
+    # into the MAF barcode here, the same biological sample would get a
+    # different Tumor_Sample_Barcode per caller, silently breaking any
+    # cross-caller join (consensus MAFs) and inflating the apparent sample
+    # count in cohort-wide oncoplots/merges.
     t_id = n_id = None
     for s in samples:
         if s == tumor_tok:
@@ -172,7 +185,9 @@ def resolve_tumor_normal(contrast, samples, sample_meta):
             t_id = remaining.pop(0)
         if normal_tok is not None and n_id is None and remaining:
             n_id = remaining.pop(0)
-    return t_id, n_id, t_id, n_id
+    report_t_id = tumor_tok if t_id is not None else None
+    report_n_id = normal_tok if n_id is not None else None
+    return report_t_id, report_n_id, t_id, n_id
 
 
 def find_vcfs_for_caller(outdir, caller, override_dir=""):
