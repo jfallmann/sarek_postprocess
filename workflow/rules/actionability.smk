@@ -14,6 +14,7 @@ rule actionability_report:
         f"{OUTDIR}/logs/actionability_report.log",
     resources:
         tmpdir=R_TMPDIR,
+        mem_mb=2000,
     conda:
         "../envs/r_env.yaml"
     script:

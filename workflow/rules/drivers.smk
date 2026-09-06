@@ -31,6 +31,7 @@ rule driver_candidates:
         f"{OUTDIR}/logs/driver_candidates/{{vcset}}.log",
     resources:
         tmpdir=R_TMPDIR,
+        mem_mb=8000,
     conda:
         "../envs/r_env.yaml"
     script:

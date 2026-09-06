@@ -63,13 +63,19 @@ if (length(dt_list) == 0) {
 }
 
 union_dt <- rbindlist(dt_list, use.names = TRUE, fill = TRUE)
+rm(dt_list); gc()
 union_dt <- apply_quality_filters(union_dt, filtering)
 fwrite_gz(union_dt, out_union, sep = "\t", quote = FALSE)
 
-key_cols <- c("Chromosome", "Start_Position", "End_Position", "Tumor_Sample_Barcode", "Hugo_Symbol")
-key_cols <- intersect(key_cols, names(union_dt))
+## Include the alleles in the consensus key (not just position/gene): WGS
+## carries far more multi-allelic/nearby-indel sites than WES, so two
+## callers reporting different alt alleles at the same position must not be
+## counted as "confirmed by >=2 callers" for the same variant.
+key_cols_full <- c("Chromosome", "Start_Position", "End_Position", "Reference_Allele",
+                    "Tumor_Seq_Allele2", "Tumor_Sample_Barcode", "Hugo_Symbol")
+key_cols <- intersect(key_cols_full, names(union_dt))
 
-if (length(key_cols) == length(c("Chromosome", "Start_Position", "End_Position", "Tumor_Sample_Barcode", "Hugo_Symbol"))) {
+if (length(key_cols) == length(key_cols_full)) {
   caller_counts <- union_dt[, .(n_callers = uniqueN(Caller)), by = key_cols]
   min_callers <- filtering$consensus_min_callers %||% 2L
   consensus_keys <- caller_counts[n_callers >= min_callers]

@@ -43,6 +43,7 @@ rule consolidate_contrast:
         f"{OUTDIR}/logs/consolidate/{{vcset}}/{{contrast}}.log",
     resources:
         tmpdir=R_TMPDIR,
+        mem_mb=4000,
     conda:
         "../envs/r_env.yaml"
     script:
@@ -73,6 +74,7 @@ rule build_cohort_union:
         f"{OUTDIR}/logs/build_cohort_union/{{vcset}}.log",
     resources:
         tmpdir=R_TMPDIR,
+        mem_mb=32000,
     conda:
         "../envs/r_env.yaml"
     script:

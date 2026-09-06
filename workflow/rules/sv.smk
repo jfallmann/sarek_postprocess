@@ -20,6 +20,7 @@ rule summarize_manta_sv:
         f"{OUTDIR}/logs/manta/{{contrast}}.log",
     resources:
         tmpdir=R_TMPDIR,
+        mem_mb=2000,
     conda:
         "../envs/r_env.yaml"
     script:

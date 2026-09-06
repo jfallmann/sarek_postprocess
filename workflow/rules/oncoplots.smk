@@ -5,10 +5,13 @@ rule cohort_oncoplots:
         done=f"{OUTDIR}/oncoplots/cohort/{{vcset}}/.done",
     params:
         out_dir=f"{OUTDIR}/oncoplots/cohort/{{vcset}}",
+        gene_panel_csv=config["gene_panel_csv"],
+        common_r=f"{workflow.basedir}/scripts/common.R",
     log:
         f"{OUTDIR}/logs/cohort_oncoplots/{{vcset}}.log",
     resources:
         tmpdir=R_TMPDIR,
+        mem_mb=16000,
     conda:
         "../envs/r_env.yaml"
     script:

@@ -86,6 +86,11 @@ filtering:
   # the caller-specific behaviour already validated on the WES cohort.
   qual_override_by_caller:
     strelka_indels: false
+  # NB: deliberately lower than the WES-era thresholds these were adapted
+  # from (GENOMICS/MAF_Analysis.R used min_depth=50, min_vaf=0.05-0.2) -
+  # WGS coverage (~30-60x) is much shallower than WES capture (~100-500x);
+  # copying the WES depth cutoffs verbatim would silently drop most WGS
+  # calls. Do not raise these back to WES values.
   min_depth: 20
   min_alt_count: 3
   min_vaf: 0.05
@@ -150,6 +155,13 @@ cnv:
   enabled: true
   min_log2_gain: 0.3       # cnvkit log2 ratio threshold to call a gene "gain"
   min_log2_loss: -0.3      # cnvkit log2 ratio threshold to call a gene "loss"
+  # Segment quality gate applied before collapsing to gene level, ported
+  # from GENOMICS/CNV/CNV_from_WES.R's weight > 0.5 filter: drops
+  # low-confidence/background/antitarget-adjacent bins so they can't pull
+  # log2_weighted toward a false gain/loss call. Set min_probes to 0 to
+  # disable the probe-count gate (only "weight" is filtered by default).
+  min_weight: 0.5
+  min_probes: 0
   # Genes shown in the cohort CNV heatmap; defaults to gene_panel_csv above
   # if left empty.
   heatmap_gene_panel_csv: ""

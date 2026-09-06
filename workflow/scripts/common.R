@@ -130,6 +130,10 @@ read_gene_panel <- function(csv_path) {
   unique(fread(csv_path, header = TRUE)[[1]])
 }
 
+## Deliberately narrower than vc_nonsyn_custom (which also keeps
+## Intron/UTR/RNA/Splice_Region for the "custom" track): oncoplots/mutation
+## burden want sensitivity across the whole WGS territory, driver ranking
+## wants coding impact only. The two are meant to diverge.
 impactful_variant_classes <- c(
   "Missense_Mutation", "Nonsense_Mutation", "Frame_Shift_Del", "Frame_Shift_Ins",
   "Splice_Site", "In_Frame_Del", "In_Frame_Ins", "Nonstop_Mutation",

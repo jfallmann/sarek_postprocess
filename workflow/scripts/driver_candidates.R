@@ -62,6 +62,7 @@ if (length(dt_list) == 0) {
 }
 
 all_dt <- rbindlist(dt_list, use.names = TRUE, fill = TRUE)
+rm(dt_list); gc()
 
 ## Per-contrast candidate tables -------------------------------------------
 for (contrast in unique(all_dt$Contrast)) {

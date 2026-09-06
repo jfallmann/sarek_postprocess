@@ -13,10 +13,13 @@ rule summarize_cnvkit:
         gene_tsv=f"{OUTDIR}/cnv/{{contrast}}.cnvkit_genes.tsv.gz",
     params:
         common_r=f"{workflow.basedir}/scripts/common.R",
+        min_weight=config.get("cnv", {}).get("min_weight", 0.5),
+        min_probes=config.get("cnv", {}).get("min_probes", 0),
     log:
         f"{OUTDIR}/logs/cnvkit/{{contrast}}.log",
     resources:
         tmpdir=R_TMPDIR,
+        mem_mb=2000,
     conda:
         "../envs/r_env.yaml"
     script:
@@ -49,6 +52,7 @@ rule cohort_cnv_matrix:
         f"{OUTDIR}/logs/cohort_cnv_matrix.log",
     resources:
         tmpdir=R_TMPDIR,
+        mem_mb=2000,
     conda:
         "../envs/r_env.yaml"
     script:

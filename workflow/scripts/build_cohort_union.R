@@ -60,12 +60,22 @@ if (length(maf_list) == 0) {
   quit(save = "no", status = 0)
 }
 
-maf_union <- if (length(maf_list) == 1) maf_list[[1]] else merge_mafs(maf = maf_list, verbose = FALSE)
+## Pull the (tiny) per-contrast clinical rows out before merge_mafs() runs,
+## so nothing extra needs to stay attached to maf_list afterwards.
 all_clin <- rbindlist(lapply(maf_list, function(m) m@clinical.data), use.names = TRUE, fill = TRUE)
 all_clin <- unique(all_clin, by = "Tumor_Sample_Barcode")
+
+maf_union <- if (length(maf_list) == 1) maf_list[[1]] else merge_mafs(maf = maf_list, verbose = FALSE)
 maf_union@clinical.data <- all_clin
 
+## Write + drop the two large cohort-wide objects one at a time instead of
+## keeping both fully resident while both gzip writes happen back to back -
+## on a WGS "custom" (permissive) union track this pair is the single
+## biggest peak-memory point in the pipeline.
 saveRDS(maf_union, gzfile(out_union))
-saveRDS(maf_list, gzfile(out_maflist))
+rm(maf_union); gc()
 
-message("Cohort union built from ", length(maf_list), " contrasts")
+saveRDS(maf_list, gzfile(out_maflist))
+rm(maf_list); gc()
+
+message("Cohort union built from ", length(contrasts), " contrasts")

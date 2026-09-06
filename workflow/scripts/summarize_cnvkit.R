@@ -14,9 +14,11 @@ suppressPackageStartupMessages({
 
 source(snakemake@params[["common_r"]])
 
-cns_path <- snakemake@input[["cns"]]
-contrast <- snakemake@wildcards[["contrast"]]
-out_tsv  <- snakemake@output[["gene_tsv"]]
+cns_path   <- snakemake@input[["cns"]]
+contrast   <- snakemake@wildcards[["contrast"]]
+out_tsv    <- snakemake@output[["gene_tsv"]]
+min_weight <- snakemake@params[["min_weight"]] %||% 0.5
+min_probes <- snakemake@params[["min_probes"]] %||% 0
 
 dir.create(dirname(out_tsv), showWarnings = FALSE, recursive = TRUE)
 
@@ -36,6 +38,24 @@ if (!"gene" %in% names(cns) || nrow(cns) == 0) {
 
 weight_col <- intersect(c("weight", "probes"), names(cns))
 cns[, `:=`(.weight = if (length(weight_col) > 0) get(weight_col[1]) else 1)]
+
+## Drop low-confidence segments before collapsing to gene level (mirrors
+## GENOMICS/CNV/CNV_from_WES.R's weight > 0.5 quality gate), so background/
+## antitarget-adjacent bins can't pull log2_weighted toward a false
+## gain/loss call. Only applied when the corresponding column exists.
+n_before <- nrow(cns)
+if ("weight" %in% names(cns)) cns <- cns[is.na(weight) | weight >= min_weight]
+if ("probes" %in% names(cns) && min_probes > 0) cns <- cns[is.na(probes) | probes >= min_probes]
+if (nrow(cns) < n_before) {
+  message(nrow(cns), "/", n_before, " segments retained for ", contrast,
+          " after weight/probes quality filter (min_weight=", min_weight, ", min_probes=", min_probes, ")")
+}
+
+if (nrow(cns) == 0) {
+  message("No segments remain after quality filtering for ", contrast)
+  fwrite_gz(data.table(), out_tsv, sep = "\t")
+  quit(save = "no", status = 0)
+}
 
 expanded <- cns[, .(Hugo_Symbol = trimws(unlist(strsplit(gene, "[,;]")))), by = seq_len(nrow(cns))]
 expanded <- cbind(expanded, cns[expanded$seq_len, .(log2, .weight, chromosome, start, end,

@@ -55,6 +55,22 @@ adapts to however many samples/contrasts an outdir actually contains.
    ```
    `--use-conda` builds the two environments in `workflow/envs/` (vcf2maf+VEP,
    R+maftools/MutationalPatterns) per rule.
+6. Running locally instead of on a cluster: every rule declares a `mem_mb`
+   resource (see `workflow/rules/*.smk`), but Snakemake only enforces it if
+   you tell it your machine's budget. Pass `--resources mem_mb=<N>` (leave
+   some headroom below your total RAM, e.g. `55000` on a 60 GB box) so
+   Snakemake caps how many memory-heavy jobs (`build_cohort_union`,
+   `cohort_oncoplots`, `mutational_signatures`, `vcf2maf`) run concurrently
+   instead of scheduling as many as `--cores` allows:
+   ```bash
+   snakemake -s workflow/Snakefile --configfile config/my_run.yaml \
+     --use-conda --cores 8 --resources mem_mb=55000
+   ```
+   The single biggest local memory consumer for a WGS cohort is
+   `build_cohort_union` (holds the whole cohort's union MAF in memory
+   twice); if it still OOMs at 55000, either lower `--cores` further so
+   fewer other jobs compete for the remaining headroom, or fall back to the
+   cluster.
 
 ## Layout
 

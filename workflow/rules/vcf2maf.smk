@@ -42,6 +42,9 @@ rule vcf2maf:
     log:
         f"{OUTDIR}/logs/vcf2maf/{{contrast}}.{{caller}}.log",
     threads: config.get("threads_default", 4)
+    resources:
+        tmpdir=R_TMPDIR,
+        mem_mb=8000,
     conda:
         "../envs/vcf2maf.yaml"
     shell:
