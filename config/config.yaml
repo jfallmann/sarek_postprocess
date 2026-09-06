@@ -145,6 +145,30 @@ signatures:
 # --- Structural variants (Manta) ---------------------------------------------
 sv_analysis:
   enabled: true
+  # Only PASS/"." Manta calls count toward burden/recurrence/driver-evidence
+  # tables below (the per-contrast TSV from summarize_manta_sv.R still keeps
+  # every record, filter status included, for manual inspection).
+  pass_only: true
+  # 1-based index of the gene-symbol field inside each "|"-delimited
+  # ANN/CSQ sub-record written to Gene_Annotation. Both SnpEff's ANN
+  # (Allele|Annotation|Annotation_Impact|Gene_Name|...) and VEP's CSQ
+  # (Allele|Consequence|IMPACT|SYMBOL|...) happen to put the gene symbol at
+  # field 4 - override if your Sarek run's Manta VCFs were annotated
+  # differently.
+  gene_field_index: 4
+  # Genes shown in the cohort SV recurrence table/plot; defaults to
+  # gene_panel_csv above if left empty.
+  gene_panel_csv: ""
+  # DEL/DUP/INV events with SV_Length (bp) >= this are counted separately as
+  # "large-scale" (chromosome-arm-level amplification/deletion candidates)
+  # in the cohort SV summary, so large rearrangements aren't averaged away
+  # among many small indel-like SVs. BND/INS are excluded from this count
+  # (BND has no span; Manta's INS SVLEN is capped near the read length and
+  # is not a reliable large-event size). Cross-reference contrasts flagged
+  # here against the CNVkit cohort heatmap (cnv.min_log2_gain/loss) for
+  # copy-number-level confirmation - Manta's breakpoint-based DEL/DUP calls
+  # and CNVkit's depth-based gain/loss calls are independent evidence.
+  large_sv_min_bp: 1000000
 
 # --- Copy number variants (CNVkit) --------------------------------------------
 # CNVkit is run outside Sarek (see tool_output_dirs.cnvkit above). Uses

@@ -59,6 +59,9 @@ def get_all_targets(wildcards):
         targets.append(f"{OUTDIR}/signatures/cohort/.done")
     if config.get("sv_analysis", {}).get("enabled", False):
         targets += all_manta_sv_tsvs(wildcards)
+        if len(manta_contrasts(wildcards)) > 0:
+            targets.append(f"{OUTDIR}/sv/cohort/sv_burden_barplot.pdf")
+            targets.append(f"{OUTDIR}/sv/cohort/sv_large_events_barplot.pdf")
     if config.get("cnv", {}).get("enabled", False):
         targets.append(f"{OUTDIR}/cnv/cohort/cnv_heatmap.pdf")
     if config.get("actionability", {}).get("enabled", False):

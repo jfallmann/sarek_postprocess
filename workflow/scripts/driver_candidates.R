@@ -29,6 +29,7 @@ filtering       <- snakemake@params[["filtering"]]
 gene_panel_csv  <- snakemake@params[["gene_panel_csv"]]
 baseline_tsv    <- snakemake@params[["baseline_mutations_tsv"]]
 cnv_calls_tsv   <- snakemake@params[["cnv_calls_tsv"]]
+sv_calls_tsv    <- snakemake@params[["sv_calls_tsv"]]
 out_per_contrast_dir <- snakemake@params[["out_per_contrast_dir"]]
 out_cohort_ranked     <- snakemake@output[["cohort_ranked"]]
 
@@ -103,6 +104,29 @@ if (!is.null(cnv_calls_tsv) && nzchar(cnv_calls_tsv) && file.exists(cnv_calls_ts
   }
 } else {
   message("No CNV calls TSV configured/found; skipping CNV evidence merge")
+}
+
+## Optional corroborating Manta structural-variant evidence -----------------
+## (results/sv/cohort/sv_gene_calls.tsv.gz, see cohort_sv_summary.R).
+if (!is.null(sv_calls_tsv) && nzchar(sv_calls_tsv) && file.exists(sv_calls_tsv) &&
+    file.info(sv_calls_tsv)$size > 0) {
+  sv_calls <- fread(sv_calls_tsv)
+  if (all(c("Hugo_Symbol", "Contrast", "SV_Types") %in% names(sv_calls))) {
+    sv_summary <- sv_calls[, .(
+      SV_Contrasts = paste(sort(unique(Contrast)), collapse = ";"),
+      n_SV         = uniqueN(Contrast),
+      SV_Types     = paste(sort(unique(unlist(strsplit(SV_Types, ";")))), collapse = ";")
+    ), by = Hugo_Symbol]
+    recur <- merge(recur, sv_summary, by = "Hugo_Symbol", all.x = TRUE)
+    recur[is.na(n_SV), n_SV := 0L]
+    for (col in c("SV_Contrasts", "SV_Types")) recur[is.na(get(col)), (col) := ""]
+    recur[, Score := Score + 0.25 * (n_SV > 0)]
+    message("Merged Manta SV evidence for ", nrow(sv_summary), " genes with a structural-variant hit")
+  } else {
+    message("SV gene calls TSV missing expected columns; skipping SV evidence merge")
+  }
+} else {
+  message("No SV gene calls TSV configured/found; skipping SV evidence merge")
 }
 
 setorder(recur, -Score, -n_contrasts, Hugo_Symbol)
