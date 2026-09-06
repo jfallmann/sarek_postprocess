@@ -15,6 +15,8 @@ rule summarize_cnvkit:
         common_r=f"{workflow.basedir}/scripts/common.R",
     log:
         f"{OUTDIR}/logs/cnvkit/{{contrast}}.log",
+    resources:
+        tmpdir=R_TMPDIR,
     conda:
         "../envs/r_env.yaml"
     script:
@@ -45,6 +47,8 @@ rule cohort_cnv_matrix:
         min_log2_loss=config.get("cnv", {}).get("min_log2_loss", -0.3),
     log:
         f"{OUTDIR}/logs/cohort_cnv_matrix.log",
+    resources:
+        tmpdir=R_TMPDIR,
     conda:
         "../envs/r_env.yaml"
     script:

@@ -41,6 +41,8 @@ rule consolidate_contrast:
         filtering=config["filtering"],
     log:
         f"{OUTDIR}/logs/consolidate/{{vcset}}/{{contrast}}.log",
+    resources:
+        tmpdir=R_TMPDIR,
     conda:
         "../envs/r_env.yaml"
     script:
@@ -69,6 +71,8 @@ rule build_cohort_union:
         sample_subset_regex=config.get("sample_subset_regex", ""),
     log:
         f"{OUTDIR}/logs/build_cohort_union/{{vcset}}.log",
+    resources:
+        tmpdir=R_TMPDIR,
     conda:
         "../envs/r_env.yaml"
     script:

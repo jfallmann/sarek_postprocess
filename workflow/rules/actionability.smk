@@ -12,6 +12,8 @@ rule actionability_report:
         civic_variant_summary_tsv=config["actionability"].get("civic_variant_summary_tsv", ""),
     log:
         f"{OUTDIR}/logs/actionability_report.log",
+    resources:
+        tmpdir=R_TMPDIR,
     conda:
         "../envs/r_env.yaml"
     script:

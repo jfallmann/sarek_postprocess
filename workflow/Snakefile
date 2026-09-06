@@ -5,6 +5,15 @@ configfile: "config/config.yaml"
 
 OUTDIR = config["outdir"]
 
+# R (and any other) jobs default their own tempdir (e.g. R's tempdir(), used
+# by data.table/maftools when reading large gzipped MAFs) to /tmp, which on
+# many clusters is a small-quota tmpfs - large WGS MAFs can exhaust it and
+# fail with "Disk quota exceeded" even though the real output filesystem has
+# plenty of room. Route job tempdirs through the same configurable tmp_dir
+# already used by vcf2maf's shell script, via Snakemake's special "tmpdir"
+# resource (sets TMPDIR/TMP/TEMP for the job).
+R_TMPDIR = config.get("tmp_dir") or "/tmp"
+
 
 wildcard_constraints:
     contrast=r"[^/]+",

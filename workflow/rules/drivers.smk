@@ -29,6 +29,8 @@ rule driver_candidates:
         out_per_contrast_dir=f"{OUTDIR}/drivers/{{vcset}}/per_contrast",
     log:
         f"{OUTDIR}/logs/driver_candidates/{{vcset}}.log",
+    resources:
+        tmpdir=R_TMPDIR,
     conda:
         "../envs/r_env.yaml"
     script:

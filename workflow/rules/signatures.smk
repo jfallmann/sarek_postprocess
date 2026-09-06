@@ -25,6 +25,8 @@ rule mutational_signatures:
         common_r=f"{workflow.basedir}/scripts/common.R",
     log:
         f"{OUTDIR}/logs/mutational_signatures.log",
+    resources:
+        tmpdir=R_TMPDIR,
     conda:
         "../envs/r_env.yaml"
     script:

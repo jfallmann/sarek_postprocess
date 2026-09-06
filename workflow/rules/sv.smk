@@ -18,6 +18,8 @@ rule summarize_manta_sv:
         common_r=f"{workflow.basedir}/scripts/common.R",
     log:
         f"{OUTDIR}/logs/manta/{{contrast}}.log",
+    resources:
+        tmpdir=R_TMPDIR,
     conda:
         "../envs/r_env.yaml"
     script:

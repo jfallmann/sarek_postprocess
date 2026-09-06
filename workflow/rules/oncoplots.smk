@@ -7,6 +7,8 @@ rule cohort_oncoplots:
         out_dir=f"{OUTDIR}/oncoplots/cohort/{{vcset}}",
     log:
         f"{OUTDIR}/logs/cohort_oncoplots/{{vcset}}.log",
+    resources:
+        tmpdir=R_TMPDIR,
     conda:
         "../envs/r_env.yaml"
     script:
