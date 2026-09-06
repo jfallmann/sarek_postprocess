@@ -75,9 +75,28 @@ key_cols_full <- c("Chromosome", "Start_Position", "End_Position", "Reference_Al
                     "Tumor_Seq_Allele2", "Tumor_Sample_Barcode", "Hugo_Symbol")
 key_cols <- intersect(key_cols_full, names(union_dt))
 
-if (length(key_cols) == length(key_cols_full)) {
+min_callers <- filtering$consensus_min_callers %||% 2L
+
+## Contrasts without a matched normal (bare "<sample>" contrasts, i.e. no
+## "_vs_" in the name) only ever have Strelka's germline workflow output -
+## Mutect2/Strelka-somatic need a tumor/normal pair and never run for them.
+## So `uniqueN(callers) < min_callers` is structural, not a filtering
+## artifact: >=2-caller agreement can never be reached for these, and the
+## strict consensus rule below would silently produce an always-empty
+## consensus MAF, breaking every downstream step that reads it. Fall back
+## to the union (best-available single-caller calls) in that case, and
+## keep the strict multi-caller-agreement rule for tumor/normal contrasts
+## that do have >=2 callers (mutect2 + strelka_snvs + strelka_indels).
+n_distinct_callers <- uniqueN(callers)
+
+if (n_distinct_callers < min_callers) {
+  message("Contrast ", contrast, " has only ", n_distinct_callers,
+          " caller(s) available (likely a tumor-only/vs-reference contrast); ",
+          ">=", min_callers, "-caller consensus is not structurally possible, ",
+          "using union as consensus")
+  consensus_dt <- union_dt
+} else if (length(key_cols) == length(key_cols_full)) {
   caller_counts <- union_dt[, .(n_callers = uniqueN(Caller)), by = key_cols]
-  min_callers <- filtering$consensus_min_callers %||% 2L
   consensus_keys <- caller_counts[n_callers >= min_callers]
   consensus_dt <- union_dt[consensus_keys, on = key_cols, mult = "first"]
 } else {
