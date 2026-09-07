@@ -51,9 +51,13 @@ CALLER_FILE_PATTERNS = {
         (re.compile(r"\.strelka\.variants.*\.vcf\.gz$"), "strelka_variants"),
     ],
     "manta": [
-        (re.compile(r"\.somaticSV.*\.vcf\.gz$"), "manta_somatic"),
-        (re.compile(r"\.diploidSV.*\.vcf\.gz$"), "manta_diploid"),
-        (re.compile(r"\.candidateSV.*\.vcf\.gz$"), "manta_candidate"),
+        # Sarek's nf-core module names these "diploid_sv"/"somatic_sv" (with
+        # an underscore, lowercase) once annotated by snpEff/VEP - e.g.
+        # "<contrast>.manta.somatic_sv_snpEff_VEP.ann.vcf.gz" - not Manta's
+        # own bare "somaticSV.vcf.gz" naming. Match both spellings.
+        (re.compile(r"\.somatic_?sv.*\.vcf\.gz$", re.IGNORECASE), "manta_somatic"),
+        (re.compile(r"\.diploid_?sv.*\.vcf\.gz$", re.IGNORECASE), "manta_diploid"),
+        (re.compile(r"\.candidate_?sv.*\.vcf\.gz$", re.IGNORECASE), "manta_candidate"),
     ],
 }
 
@@ -138,7 +142,14 @@ def resolve_tumor_normal(contrast, samples, sample_meta):
         tumor_tok, normal_tok = contrast, None
 
     if len(samples) == 1:
-        return samples[0], None, samples[0], None
+        # Tumor-only VCFs (e.g. Strelka's germline "variants" workflow) have
+        # exactly one genotype column, but it is not necessarily the clean
+        # contrast token - it can carry a library suffix just like Mutect2's
+        # tumor-normal columns do (e.g. "BC139_1_BC139_naive" for contrast
+        # "BC139_naive"). Report the clean contrast token as the MAF barcode
+        # (report_t_id) while keeping the raw VCF column name (vcf_t_id) for
+        # --vcf-tumor-id, same separation as the multi-sample branches below.
+        return tumor_tok, None, samples[0], None
 
     if normal_tok is not None and {s.lower() for s in samples} == GENERIC_VCF_SAMPLE_LABELS:
         vcf_t = next(s for s in samples if s.lower() == "tumor")
