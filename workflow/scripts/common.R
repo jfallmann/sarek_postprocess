@@ -21,7 +21,11 @@ fwrite_gz <- function(dt, path, ...) {
   on.exit(if (file.exists(tmp)) unlink(tmp), add = TRUE)
   fwrite(dt, tmp, ...)
   if (requireNamespace("R.utils", quietly = TRUE)) {
-    R.utils::gzip(tmp, destname = path, remove = TRUE)
+    ## overwrite = TRUE: this is called on every rule re-run (e.g. Snakemake
+    ## --forcerun, or reruns after a fix), and the destination almost always
+    ## already exists from the previous run - R.utils::gzip() errors out by
+    ## default ("File already exists") instead of overwriting it.
+    R.utils::gzip(tmp, destname = path, remove = TRUE, overwrite = TRUE)
   } else {
     system2("gzip", c("-f", shQuote(tmp)))
     stopifnot(file.exists(paste0(tmp, ".gz")))
