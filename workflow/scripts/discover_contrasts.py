@@ -141,15 +141,15 @@ def resolve_tumor_normal(contrast, samples, sample_meta):
     else:
         tumor_tok, normal_tok = contrast, None
 
-    if len(samples) == 1:
-        # Tumor-only VCFs (e.g. Strelka's germline "variants" workflow) have
-        # exactly one genotype column, but it is not necessarily the clean
-        # contrast token - it can carry a library suffix just like Mutect2's
-        # tumor-normal columns do (e.g. "BC139_1_BC139_naive" for contrast
-        # "BC139_naive"). Report the clean contrast token as the MAF barcode
-        # (report_t_id) while keeping the raw VCF column name (vcf_t_id) for
-        # --vcf-tumor-id, same separation as the multi-sample branches below.
-        return tumor_tok, None, samples[0], None
+    # NOTE: deliberately no len(samples) == 1 shortcut here. A single-sample
+    # VCF is not always the tumor: Manta's diploidSV workflow for a
+    # tumor-normal contrast emits SV calls against the *normal/germline*
+    # sample only (one genotype column, carrying the normal's, not the
+    # tumor's, library-suffixed name), while Strelka's tumor-only "variants"
+    # workflow emits the tumor sample. The substring/token matching below
+    # already disambiguates this correctly for any sample count, matching
+    # the single column against normal_tok as readily as tumor_tok - so it
+    # is reused here instead of assuming "the one sample is the tumor".
 
     if normal_tok is not None and {s.lower() for s in samples} == GENERIC_VCF_SAMPLE_LABELS:
         vcf_t = next(s for s in samples if s.lower() == "tumor")
