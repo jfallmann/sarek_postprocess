@@ -156,7 +156,13 @@ dev.off()
 sv_for_genes <- if (pass_only) count_dt[Is_Pass == TRUE] else count_dt
 
 extract_genes <- function(ann_string) {
-  if (is.na(ann_string) || !nzchar(ann_string)) return(character(0))
+  ## Called per data.table group (Contrast, SV_Type, Chromosome, Start, End,
+  ## Filter); that key is not guaranteed unique to a single row (e.g. two
+  ## overlapping SV records at the same coordinates), so ann_string can be a
+  ## vector of length > 1 here, not a scalar - handle any length instead of
+  ## assuming one string.
+  ann_string <- ann_string[!is.na(ann_string) & nzchar(ann_string)]
+  if (length(ann_string) == 0) return(character(0))
   records <- unlist(strsplit(ann_string, ";", fixed = TRUE))
   genes <- vapply(records, function(rec) {
     fields <- strsplit(rec, "|", fixed = TRUE)[[1]]
