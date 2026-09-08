@@ -40,7 +40,16 @@ rule cohort_cnv_matrix:
     output:
         matrix_tsv=f"{OUTDIR}/cnv/cohort/cnv_matrix.tsv.gz",
         calls_tsv=f"{OUTDIR}/cnv/cohort/cnv_calls.tsv.gz",
-        heatmap_pdf=f"{OUTDIR}/cnv/cohort/cnv_heatmap.pdf",
+        # Two separate heatmaps instead of one cohort-wide plot: "vs_reference"
+        # (bare tumor-only contrasts, called against a generic/pooled
+        # reference) and "vs_contrast" (matched tumor/normal "*_vs_Bulk_sensitive"
+        # contrasts) have different copy-number backgrounds and are not
+        # meaningfully comparable side by side - mixing them was also what
+        # made the single heatmap too large to open/read. matrix_tsv/calls_tsv
+        # stay cohort-wide (driver_candidates.R needs all evidence regardless
+        # of contrast type).
+        heatmap_vs_reference_pdf=f"{OUTDIR}/cnv/cohort/cnv_heatmap.vs_reference.pdf",
+        heatmap_vs_contrast_pdf=f"{OUTDIR}/cnv/cohort/cnv_heatmap.vs_contrast.pdf",
     params:
         common_r=f"{workflow.basedir}/scripts/common.R",
         contrasts=cnv_contrasts,

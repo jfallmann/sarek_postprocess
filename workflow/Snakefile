@@ -60,10 +60,15 @@ def get_all_targets(wildcards):
     if config.get("sv_analysis", {}).get("enabled", False):
         targets += all_manta_sv_tsvs(wildcards)
         if len(manta_contrasts(wildcards)) > 0:
-            targets.append(f"{OUTDIR}/sv/cohort/sv_burden_barplot.pdf")
-            targets.append(f"{OUTDIR}/sv/cohort/sv_large_events_barplot.pdf")
+            targets.append(f"{OUTDIR}/sv/cohort/sv_burden_barplot.vs_reference.pdf")
+            targets.append(f"{OUTDIR}/sv/cohort/sv_burden_barplot.vs_contrast.pdf")
+            targets.append(f"{OUTDIR}/sv/cohort/sv_large_events_barplot.vs_reference.pdf")
+            targets.append(f"{OUTDIR}/sv/cohort/sv_large_events_barplot.vs_contrast.pdf")
+            targets.append(f"{OUTDIR}/sv/cohort/sv_genome_heatmap.vs_reference.pdf")
+            targets.append(f"{OUTDIR}/sv/cohort/sv_genome_heatmap.vs_contrast.pdf")
     if config.get("cnv", {}).get("enabled", False):
-        targets.append(f"{OUTDIR}/cnv/cohort/cnv_heatmap.pdf")
+        targets.append(f"{OUTDIR}/cnv/cohort/cnv_heatmap.vs_reference.pdf")
+        targets.append(f"{OUTDIR}/cnv/cohort/cnv_heatmap.vs_contrast.pdf")
     if config.get("actionability", {}).get("enabled", False):
         targets.append(f"{OUTDIR}/actionability/actionability_report.tsv.gz")
     return targets

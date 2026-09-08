@@ -124,14 +124,36 @@ exclude_baseline_mutations <- function(dt, baseline_dt) {
   dt[-hit]
 }
 
+## Default driver/resistance gene panel, used whenever gene_panel_csv is not
+## configured or the file cannot be found - so driver ranking, oncoplots,
+## the CNV heatmap and the SV summary always have a sensible, non-empty
+## panel to restrict to instead of silently falling back to "all genes"
+## (which is what made the CNV heatmap unreadably large before this panel
+## existed). Lung/RTK-RAS-pathway-focused set covering the common
+## actionable driver and resistance genes; override via config.yaml's
+## gene_panel_csv for a project-specific panel.
+DEFAULT_GENE_PANEL <- unique(c(
+  "KRAS", "ATM", "ERBB2", "KDR", "NRAS", "BRAF", "EGFR", "TP53", "STK11", "KEAP1", "BRAF", "MET", "ALK", "RET", "ROS1", "PIK3CA", "RB1",
+  "EGFR", "RET", "MET", "NRAS", "RIT1", "NF1", "BRAF", "MAP2K1", "PIK3CA", "PIK3R1", "PTEN", "EML4", "ALK", "CCDC6", "FGFR3", "TACC3", "AKAP9", "NRF1", "RAF1", "CCDC176", "TRAK1"
+))
+
 #' Read the gene panel CSV (single "Gene" column) used for driver/resistance
-#' prioritization.
+#' prioritization. Falls back to DEFAULT_GENE_PANEL if csv_path is not
+#' configured or the file does not exist, rather than returning an empty
+#' panel (which turns off gene-panel restriction everywhere it is used).
+#' When csv_path does exist, DEFAULT_GENE_PANEL is still unioned in - it is
+#' always-on baseline coverage of common actionable driver/resistance genes,
+#' on top of whatever project-specific panel is configured, so a narrower or
+#' incomplete project CSV can't silently drop drivers/lollipops that should
+#' always be checked for.
 read_gene_panel <- function(csv_path) {
   if (is.null(csv_path) || !nzchar(csv_path) || !file.exists(csv_path)) {
-    message("Gene panel CSV not found at ", csv_path, "; candidate ranking will not use a panel")
-    return(character(0))
+    message("Gene panel CSV not found at ", csv_path, "; using built-in DEFAULT_GENE_PANEL (",
+            length(DEFAULT_GENE_PANEL), " genes)")
+    return(DEFAULT_GENE_PANEL)
   }
-  unique(fread(csv_path, header = TRUE)[[1]])
+  csv_genes <- fread(csv_path, header = TRUE)[[1]]
+  union(unique(csv_genes), DEFAULT_GENE_PANEL)
 }
 
 ## Deliberately narrower than vc_nonsyn_custom (which also keeps

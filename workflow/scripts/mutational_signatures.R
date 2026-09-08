@@ -76,11 +76,23 @@ contribution <- fit_res$contribution
 fwrite_gz(as.data.table(contribution, keep.rownames = "signature"),
        file.path(out_dir, "signature_contributions.tsv.gz"), sep = "\t")
 
-pdf(file.path(out_dir, "signature_contribution_heatmap.pdf"), width = 10, height = 8)
-print(plot_contribution_heatmap(contribution, cluster_samples = FALSE))
+## Both plots put one bar/column per contrast; with the default fixed-size
+## PDFs long contrast names (e.g. "*_vs_Bulk_sensitive") get clipped off the
+## x-axis. Scale the canvas with the number/length of contrasts instead, and
+## angle the heatmap's x-axis labels so they fit without truncation.
+n_contrasts <- ncol(contribution)
+max_contrast_len <- max(nchar(colnames(contribution)), 1)
+heatmap_width  <- max(10, n_contrasts * 0.4 + max_contrast_len * 0.12)
+barplot_height <- max(6, n_contrasts * 0.3 + max_contrast_len * 0.05)
+
+pdf(file.path(out_dir, "signature_contribution_heatmap.pdf"), width = heatmap_width, height = 8)
+heatmap_plot <- plot_contribution_heatmap(contribution, cluster_samples = FALSE)
+print(heatmap_plot + ggplot2::theme(axis.text.x = ggplot2::element_text(angle = 45, hjust = 1)))
 dev.off()
 
-pdf(file.path(out_dir, "signature_contribution_barplot.pdf"), width = 10, height = 6)
+## coord_flip = TRUE puts contrasts on the (now horizontal) axis, so it is the
+## plot height, not width, that must grow with the number/length of contrasts.
+pdf(file.path(out_dir, "signature_contribution_barplot.pdf"), width = 10, height = barplot_height)
 print(plot_contribution(contribution, coord_flip = TRUE, mode = "relative"))
 dev.off()
 

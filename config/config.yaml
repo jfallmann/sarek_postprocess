@@ -169,6 +169,11 @@ sv_analysis:
   # copy-number-level confirmation - Manta's breakpoint-based DEL/DUP calls
   # and CNVkit's depth-based gain/loss calls are independent evidence.
   large_sv_min_bp: 1000000
+  # Bin size (Mb) for the genome-wide large-SV heatmap (sv_genome_heatmap.*.pdf)
+  # - shows, per contrast, which genomic bins carry a large-scale (>=
+  # large_sv_min_bp) DEL/DUP/INV, chromosome-ordered so you can see WHERE in
+  # the genome each sample's large events sit, not just how many it has.
+  genome_heatmap_bin_mb: 5
 
 # --- Copy number variants (CNVkit) --------------------------------------------
 # CNVkit is run outside Sarek (see tool_output_dirs.cnvkit above). Uses

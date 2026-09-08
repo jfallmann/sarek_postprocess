@@ -11,6 +11,8 @@
 
 suppressPackageStartupMessages({
   library(data.table)
+  library(ComplexHeatmap)
+  library(circlize)
 })
 
 source(snakemake@params[["common_r"]])
@@ -21,14 +23,32 @@ pass_only       <- isTRUE(snakemake@params[["pass_only"]])
 gene_field_idx  <- as.integer(snakemake@params[["gene_field_index"]])
 gene_panel_csv  <- snakemake@params[["gene_panel_csv"]]
 large_sv_min_bp <- as.numeric(snakemake@params[["large_sv_min_bp"]] %||% 1e6)
+bin_size_bp     <- as.numeric(snakemake@params[["genome_heatmap_bin_mb"]] %||% 5) * 1e6
 out_burden      <- snakemake@output[["burden_tsv"]]
 out_gene_calls  <- snakemake@output[["gene_calls_tsv"]]
 out_recurrent   <- snakemake@output[["recurrent_tsv"]]
-out_barplot     <- snakemake@output[["burden_barplot"]]
 out_large_sv    <- snakemake@output[["large_sv_tsv"]]
-out_large_plot  <- snakemake@output[["large_sv_barplot"]]
+out_barplot_vs_reference <- snakemake@output[["burden_barplot_vs_reference"]]
+out_barplot_vs_contrast  <- snakemake@output[["burden_barplot_vs_contrast"]]
+out_large_plot_vs_reference <- snakemake@output[["large_sv_barplot_vs_reference"]]
+out_large_plot_vs_contrast  <- snakemake@output[["large_sv_barplot_vs_contrast"]]
+out_genome_heatmap_vs_reference <- snakemake@output[["genome_heatmap_vs_reference"]]
+out_genome_heatmap_vs_contrast  <- snakemake@output[["genome_heatmap_vs_contrast"]]
 
 dir.create(dirname(out_burden), showWarnings = FALSE, recursive = TRUE)
+
+## GRCh38 primary assembly chromosome lengths (chr1-22, X, Y; UCSC "chr"-less
+## naming to match Sarek/Manta contig names) - used only to order genomic
+## bins left-to-right by chromosome/position in the genome-wide SV heatmap
+## below, not for any coordinate transformation.
+GRCH38_CHROM_LENGTHS <- c(
+  "1" = 248956422, "2" = 242193529, "3" = 198295559, "4" = 190214555,
+  "5" = 181538259, "6" = 170805979, "7" = 159345973, "8" = 145138636,
+  "9" = 138394717, "10" = 133797422, "11" = 135086622, "12" = 133275309,
+  "13" = 114364328, "14" = 107043718, "15" = 101991189, "16" = 90338345,
+  "17" = 83257441, "18" = 80373285, "19" = 58617616, "20" = 64444167,
+  "21" = 46709983, "22" = 50818468, "X" = 156040895, "Y" = 57227415
+)
 
 gene_panel <- read_gene_panel(gene_panel_csv)
 
@@ -43,14 +63,17 @@ read_one <- function(path, contrast) {
 dt_list <- Map(read_one, sv_tsvs, contrasts)
 dt_list <- Filter(Negate(is.null), dt_list)
 
+all_plot_outputs <- c(out_barplot_vs_reference, out_barplot_vs_contrast,
+                      out_large_plot_vs_reference, out_large_plot_vs_contrast,
+                      out_genome_heatmap_vs_reference, out_genome_heatmap_vs_contrast)
+
 if (length(dt_list) == 0) {
   message("No Manta SV records across any contrast; writing empty cohort SV outputs")
   fwrite_gz(data.table(), out_burden, sep = "\t")
   fwrite_gz(data.table(), out_gene_calls, sep = "\t")
   fwrite_gz(data.table(), out_recurrent, sep = "\t")
   fwrite_gz(data.table(), out_large_sv, sep = "\t")
-  pdf(out_barplot); plot.new(); text(0.5, 0.5, "No SV data available"); dev.off()
-  pdf(out_large_plot); plot.new(); text(0.5, 0.5, "No SV data available"); dev.off()
+  for (p in all_plot_outputs) { pdf(p); plot.new(); text(0.5, 0.5, "No SV data available"); dev.off() }
   quit(save = "no", status = 0)
 }
 
@@ -77,28 +100,50 @@ burden <- count_dt[, .(
 setorder(burden, Contrast, SV_Type)
 fwrite_gz(burden, out_burden, sep = "\t", quote = FALSE)
 
-pdf(out_barplot, width = max(8, uniqueN(burden$Contrast) * 0.6), height = 6)
-tryCatch({
-  plot_dt <- if (pass_only) burden[n_pass > 0, .(Contrast, SV_Type, n = n_pass)] else burden[, .(Contrast, SV_Type, n = n_total)]
-  if (nrow(plot_dt) == 0) {
-    plot.new(); text(0.5, 0.5, "No SV calls remain to plot")
-  } else {
-    mat <- dcast(plot_dt, SV_Type ~ Contrast, value.var = "n", fun.aggregate = sum, fill = 0)
-    sv_types <- mat$SV_Type
-    mat[, SV_Type := NULL]
-    mat_m <- t(as.matrix(mat))
-    colnames(mat_m) <- sv_types
-    par(mar = c(8, 4, 2, 8), xpd = TRUE)
-    cols <- rainbow(ncol(mat_m))
-    bp <- barplot(t(mat_m), beside = FALSE, col = cols, las = 2,
-                  main = paste0("Manta SV burden per contrast (", if (pass_only) "PASS-only" else "all", ")"),
-                  ylab = "SV count", cex.names = 0.7)
-    legend("topright", inset = c(-0.18, 0), legend = sv_types, fill = cols, bty = "n", cex = 0.7)
-  }
-}, error = function(e) {
-  plot.new(); text(0.5, 0.5, paste("Plot failed:", e$message))
-})
-dev.off()
+## Contrasts without a matched normal ("vs_reference", bare tumor-only) vs.
+## matched tumor/normal contrasts ("vs_contrast", "*_vs_Bulk_sensitive") have
+## different SV-calling backgrounds (Manta's diploid-only workflow vs. its
+## somatic tumor/normal workflow) and are not meaningfully comparable in one
+## plot - split every per-contrast plot below into these two groups.
+is_vs_contrast_name <- function(x) grepl("_vs_", x)
+
+## Bottom margin/plot width that scale with the longest contrast name,
+## instead of a fixed size - long names (e.g.
+## "BC139_resistant_vs_Bulk_sensitive") were being clipped at the page edge
+## under a fixed par(mar=...) regardless of how many contrasts were plotted.
+dynamic_bottom_mar <- function(names_vec) max(8, max(nchar(names_vec), 1) * 0.6)
+dynamic_height <- function(names_vec) 6 + max(nchar(names_vec), 1) * 0.05
+
+plot_burden_barplot <- function(burden_dt, out_path, group_label) {
+  contrasts_grp <- sort(unique(burden_dt$Contrast))
+  pdf(out_path, width = max(8, length(contrasts_grp) * 0.6), height = dynamic_height(contrasts_grp))
+  tryCatch({
+    plot_dt <- if (pass_only) burden_dt[n_pass > 0, .(Contrast, SV_Type, n = n_pass)] else burden_dt[, .(Contrast, SV_Type, n = n_total)]
+    if (nrow(plot_dt) == 0) {
+      plot.new(); text(0.5, 0.5, paste0("No SV calls remain to plot (", group_label, ")"))
+    } else {
+      mat <- dcast(plot_dt, SV_Type ~ Contrast, value.var = "n", fun.aggregate = sum, fill = 0)
+      sv_types <- mat$SV_Type
+      mat[, SV_Type := NULL]
+      mat_m <- t(as.matrix(mat))
+      colnames(mat_m) <- sv_types
+      par(mar = c(dynamic_bottom_mar(rownames(mat_m)), 4, 2, 8), xpd = TRUE)
+      cols <- rainbow(ncol(mat_m))
+      barplot(t(mat_m), beside = FALSE, col = cols, las = 2,
+              main = paste0("Manta SV burden per contrast (", group_label, ", ",
+                             if (pass_only) "PASS-only" else "all", ")"),
+              ylab = "SV count", cex.names = 0.7)
+      legend("topright", inset = c(-0.18, 0), legend = sv_types, fill = cols, bty = "n", cex = 0.7)
+    }
+  }, error = function(e) {
+    plot.new(); text(0.5, 0.5, paste("Plot failed:", e$message))
+  })
+  dev.off()
+}
+
+is_vs_contrast <- is_vs_contrast_name(burden$Contrast)
+plot_burden_barplot(burden[!is_vs_contrast], out_barplot_vs_reference, "vs_reference")
+plot_burden_barplot(burden[is_vs_contrast], out_barplot_vs_contrast, "vs_contrast")
 
 ## Large-scale event detection: DEL/DUP/INV segments >= large_sv_min_bp,
 ## i.e. Manta's breakpoint-based counterpart to a CNVkit-style
@@ -125,29 +170,116 @@ large_out <- large_dt[, ..large_cols]
 if (nrow(large_out) > 0) setorder(large_out, -SV_Length)
 fwrite_gz(large_out, out_large_sv, sep = "\t", quote = FALSE)
 
-pdf(out_large_plot, width = max(8, uniqueN(count_dt$Contrast) * 0.5), height = 6)
-tryCatch({
-  large_counts <- large_dt[, .N, by = Contrast]
-  ## Include every contrast (even those with zero large SVs) so the absence
-  ## of large-scale events is visible, not just omitted.
-  all_contrasts_dt <- data.table(Contrast = sort(unique(count_dt$Contrast)))
-  large_counts <- merge(all_contrasts_dt, large_counts, by = "Contrast", all.x = TRUE)
-  large_counts[is.na(N), N := 0L]
-  setorder(large_counts, -N, Contrast)
-  if (all(large_counts$N == 0)) {
-    plot.new()
-    text(0.5, 0.5, paste0("No SV >= ", format(large_sv_min_bp, big.mark = ","), " bp (DEL/DUP/INV) in any contrast"))
-  } else {
-    par(mar = c(8, 4, 2, 2))
-    barplot(large_counts$N, names.arg = large_counts$Contrast, las = 2,
-            main = paste0("Large-scale SV (DEL/DUP/INV >= ", format(large_sv_min_bp, big.mark = ","), " bp) per contrast",
-                           if (pass_only) ", PASS-only" else ""),
-            ylab = "Count", cex.names = 0.7, col = "firebrick")
+plot_large_barplot <- function(large_sub_dt, contrasts_grp, out_path, group_label) {
+  pdf(out_path, width = max(8, length(contrasts_grp) * 0.5), height = dynamic_height(contrasts_grp))
+  tryCatch({
+    large_counts <- large_sub_dt[, .N, by = Contrast]
+    ## Include every contrast (even those with zero large SVs) so the
+    ## absence of large-scale events is visible, not just omitted.
+    all_contrasts_dt <- data.table(Contrast = sort(unique(contrasts_grp)))
+    large_counts <- merge(all_contrasts_dt, large_counts, by = "Contrast", all.x = TRUE)
+    large_counts[is.na(N), N := 0L]
+    setorder(large_counts, -N, Contrast)
+    if (nrow(large_counts) == 0) {
+      plot.new(); text(0.5, 0.5, paste0("No contrasts in group '", group_label, "'"))
+    } else if (all(large_counts$N == 0)) {
+      plot.new()
+      text(0.5, 0.5, paste0("No SV >= ", format(large_sv_min_bp, big.mark = ","), " bp (DEL/DUP/INV) in any ", group_label, " contrast"))
+    } else {
+      par(mar = c(dynamic_bottom_mar(large_counts$Contrast), 4, 2, 2))
+      barplot(large_counts$N, names.arg = large_counts$Contrast, las = 2,
+              main = paste0("Large-scale SV (DEL/DUP/INV >= ", format(large_sv_min_bp, big.mark = ","), " bp) per contrast (", group_label, ")",
+                             if (pass_only) ", PASS-only" else ""),
+              ylab = "Count", cex.names = 0.7, col = "firebrick")
+    }
+  }, error = function(e) {
+    plot.new(); text(0.5, 0.5, paste("Plot failed:", e$message))
+  })
+  dev.off()
+}
+
+is_vs_contrast_count <- is_vs_contrast_name(count_dt$Contrast)
+is_vs_contrast_large <- is_vs_contrast_name(large_dt$Contrast)
+plot_large_barplot(large_dt[!is_vs_contrast_large], unique(count_dt$Contrast[!is_vs_contrast_count]),
+                    out_large_plot_vs_reference, "vs_reference")
+plot_large_barplot(large_dt[is_vs_contrast_large], unique(count_dt$Contrast[is_vs_contrast_count]),
+                    out_large_plot_vs_contrast, "vs_contrast")
+
+## Genome-wide "where in the genome" view: for each contrast, count
+## large-scale SVs (same DEL/DUP/INV >= large_sv_min_bp definition as above)
+## falling into fixed-size genomic bins, then draw a bin x contrast heatmap
+## ordered by chromosome/position (no clustering - genomic order is the
+## point). This is the standard way copy-number/SV burden is shown
+## genome-wide in tools like GISTIC/cBioPortal (a "genomic heatmap" with
+## chromosome-ordered columns/rows and chromosome boundaries marked) -
+## reused here with ComplexHeatmap (already a dependency for the CNV
+## heatmap) instead of pulling in a dedicated circos/karyotype package.
+plot_genome_heatmap <- function(large_sub_dt, contrasts_grp, out_path, group_label) {
+  if (length(contrasts_grp) == 0) {
+    pdf(out_path); plot.new(); text(0.5, 0.5, paste0("No contrasts in group '", group_label, "'")); dev.off()
+    return(invisible())
   }
-}, error = function(e) {
-  plot.new(); text(0.5, 0.5, paste("Plot failed:", e$message))
-})
-dev.off()
+  bins <- rbindlist(lapply(names(GRCH38_CHROM_LENGTHS), function(chr) {
+    len <- GRCH38_CHROM_LENGTHS[[chr]]
+    starts <- seq(1, len, by = bin_size_bp)
+    data.table(Chromosome = chr, Bin_Start = starts, Bin_End = pmin(starts + bin_size_bp - 1, len),
+               Bin_Order = seq_along(starts))
+  }))
+  bins[, Bin_Label := paste0("chr", Chromosome, ":", round(Bin_Start / 1e6), "Mb")]
+  bins[, Global_Order := .I]
+
+  dt <- large_sub_dt[Chromosome %in% names(GRCH38_CHROM_LENGTHS)]
+  if (nrow(dt) == 0) {
+    pdf(out_path); plot.new()
+    text(0.5, 0.5, paste0("No SV >= ", format(large_sv_min_bp, big.mark = ","), " bp in group '", group_label, "'"))
+    dev.off()
+    return(invisible())
+  }
+
+  ## Assign each large SV to the bin its start coordinate falls in.
+  dt[, Bin_Start := (Start %/% bin_size_bp) * bin_size_bp + 1]
+  hit_counts <- dt[, .N, by = .(Contrast, Chromosome, Bin_Start)]
+  hit_counts <- merge(hit_counts, bins, by = c("Chromosome", "Bin_Start"))
+  setorder(hit_counts, Global_Order)
+
+  ## Only keep bins that have >=1 hit in ANY contrast, in genomic order, so
+  ## the heatmap isn't mostly empty genome - but still ordered by position so
+  ## "where" is preserved.
+  hit_bin_order <- bins[Bin_Label %in% unique(hit_counts$Bin_Label)]
+  setorder(hit_bin_order, Global_Order)
+
+  mat <- matrix(0L, nrow = length(contrasts_grp), ncol = nrow(hit_bin_order),
+                dimnames = list(sort(contrasts_grp), hit_bin_order$Bin_Label))
+  for (i in seq_len(nrow(hit_counts))) {
+    mat[hit_counts$Contrast[i], hit_counts$Bin_Label[i]] <- mat[hit_counts$Contrast[i], hit_counts$Bin_Label[i]] + hit_counts$N[i]
+  }
+
+  chrom_split <- factor(hit_bin_order$Chromosome, levels = unique(hit_bin_order$Chromosome))
+  longest_row_name <- max(nchar(rownames(mat)))
+  pdf(out_path,
+      width = max(10, ncol(mat) * 0.3) + longest_row_name * 0.08,
+      height = max(4, nrow(mat) * 0.4))
+  tryCatch({
+    print(Heatmap(mat, name = paste0("Large SV\ncount"),
+                  col = colorRamp2(c(0, max(mat, na.rm = TRUE)), c("white", "firebrick")),
+                  cluster_rows = FALSE, cluster_columns = FALSE,
+                  column_split = chrom_split, column_title_rot = 90,
+                  column_title_gp = grid::gpar(fontsize = 7),
+                  row_names_gp = grid::gpar(fontsize = 8),
+                  show_column_names = FALSE,
+                  column_title = paste0("Genome-wide large SV (>= ", format(large_sv_min_bp, big.mark = ","),
+                                         " bp) location (", group_label, ")"),
+                  row_names_max_width = unit(longest_row_name * 0.09, "inches")))
+  }, error = function(e) {
+    plot.new(); text(0.5, 0.5, paste("Plot failed:", e$message))
+  })
+  dev.off()
+}
+
+plot_genome_heatmap(large_dt[!is_vs_contrast_large], unique(count_dt$Contrast[!is_vs_contrast_count]),
+                     out_genome_heatmap_vs_reference, "vs_reference")
+plot_genome_heatmap(large_dt[is_vs_contrast_large], unique(count_dt$Contrast[is_vs_contrast_count]),
+                     out_genome_heatmap_vs_contrast, "vs_contrast")
 
 ## Gene-level hit calls: explode Gene_Annotation into one row per gene ------
 ## symbol per SV record, restricted to Is_Pass by default (config
