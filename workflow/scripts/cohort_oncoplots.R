@@ -60,8 +60,12 @@ run_group_oncoplots <- function(maf_pass, group_out_dir, group_label) {
   dir.create(group_out_dir, showWarnings = FALSE, recursive = TRUE)
 
   n_genes   <- length(unique(maf_pass@gene.summary$Hugo_Symbol))
-  n_samples <- length(unique(maf_pass@data$Tumor_Sample_Barcode))
-  max_tsb_len <- max(nchar(unique(maf_pass@data$Tumor_Sample_Barcode)), 1)
+  ## maftools stores Tumor_Sample_Barcode as a factor, and nchar() errors out
+  ## on factors ("'nchar()' requires a character vector") - as.character() it
+  ## first.
+  tsb_vec <- as.character(unique(maf_pass@data$Tumor_Sample_Barcode))
+  n_samples <- length(tsb_vec)
+  max_tsb_len <- max(nchar(tsb_vec), 1)
 
   if (n_genes >= 2) {
     oc_width <- max(21, n_samples * 0.6 + max_tsb_len * 0.15)

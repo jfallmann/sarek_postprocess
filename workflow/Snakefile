@@ -5,6 +5,32 @@ configfile: "config/config.yaml"
 
 OUTDIR = config["outdir"]
 
+# Gene-panel CSV paths in config.yaml are written relative to the repo root
+# (e.g. "config/driver_resistance_genes.csv"), but rule scripts can execute
+# with a different cwd on the cluster (e.g. under a Slurm job/script
+# sandbox), which silently turned the panel "missing" and fell back to
+# DEFAULT_GENE_PANEL only. Resolve any relative panel path against the repo
+# root (parent of this workflow/ dir) once here, so every rule sees a path
+# that works regardless of the execution cwd.
+import os as _os
+
+
+def _resolve_repo_path(path):
+    if not path:
+        return path
+    if _os.path.isabs(path):
+        return path
+    return _os.path.normpath(_os.path.join(_os.path.dirname(workflow.basedir), path))
+
+
+for _panel_key in ("gene_panel_csv",):
+    if config.get(_panel_key):
+        config[_panel_key] = _resolve_repo_path(config[_panel_key])
+if config.get("cnv", {}).get("heatmap_gene_panel_csv"):
+    config["cnv"]["heatmap_gene_panel_csv"] = _resolve_repo_path(config["cnv"]["heatmap_gene_panel_csv"])
+if config.get("sv_analysis", {}).get("gene_panel_csv"):
+    config["sv_analysis"]["gene_panel_csv"] = _resolve_repo_path(config["sv_analysis"]["gene_panel_csv"])
+
 # R (and any other) jobs default their own tempdir (e.g. R's tempdir(), used
 # by data.table/maftools when reading large gzipped MAFs) to /tmp, which on
 # many clusters is a small-quota tmpfs - large WGS MAFs can exhaust it and
