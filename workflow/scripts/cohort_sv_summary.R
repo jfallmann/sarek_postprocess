@@ -225,7 +225,14 @@ plot_genome_heatmap <- function(large_sub_dt, contrasts_grp, out_path, group_lab
     data.table(Chromosome = chr, Bin_Start = starts, Bin_End = pmin(starts + bin_size_bp - 1, len),
                Bin_Order = seq_along(starts))
   }))
+  ## Bin_Label is the unique matrix-column key (chr+pos, since two different
+  ## chromosomes can share the same within-chromosome Mb offset); Bin_Pos
+  ## is just the Mb position, used only for the on-plot column labels below
+  ## - the chromosome itself is shown once per slice via the column_title
+  ## "%s" template, so repeating "chr17:" on every column label would just
+  ## be redundant clutter alongside the actual position axis.
   bins[, Bin_Label := paste0("chr", Chromosome, ":", round(Bin_Start / 1e6), "Mb")]
+  bins[, Bin_Pos := paste0(round(Bin_Start / 1e6), "Mb")]
   bins[, Global_Order := .I]
 
   ## Manta/summarize_manta_sv.R report Chromosome with a "chr" prefix (e.g.
@@ -263,20 +270,36 @@ plot_genome_heatmap <- function(large_sub_dt, contrasts_grp, out_path, group_lab
 
   chrom_split <- factor(hit_bin_order$Chromosome, levels = unique(hit_bin_order$Chromosome))
   longest_row_name <- max(nchar(rownames(mat)))
+
+  ## column_title = <fixed string> (the previous version of this plot) is a
+  ## single overall title that, together with column_split, SILENTLY
+  ## replaces ComplexHeatmap's own per-slice titles - which by default show
+  ## the chromosome name for each split panel. That is why the heatmap had
+  ## no genomic axis at all: neither the chromosome (slice title) nor the
+  ## Mb position (column names, off via show_column_names = FALSE) was ever
+  ## drawn. Fix: column_title = "%s" keeps the per-slice chromosome label
+  ## (ComplexHeatmap substitutes the split level for %s), column names are
+  ## turned back on using the Mb-only Bin_Pos label so within-chromosome
+  ## position is visible too, and the descriptive title is moved to
+  ## draw()'s own column_title, which applies to the whole heatmap rather
+  ## than overriding the per-slice ones.
   pdf(out_path,
       width = max(10, ncol(mat) * 0.3) + longest_row_name * 0.08,
-      height = max(4, nrow(mat) * 0.4))
+      height = max(5, nrow(mat) * 0.4 + 1.5))
   tryCatch({
-    print(Heatmap(mat, name = paste0("Large SV\ncount"),
+    ht <- Heatmap(mat, name = paste0("Large SV\ncount"),
                   col = colorRamp2(c(0, max(mat, na.rm = TRUE)), c("white", "firebrick")),
                   cluster_rows = FALSE, cluster_columns = FALSE,
-                  column_split = chrom_split, column_title_rot = 90,
-                  column_title_gp = grid::gpar(fontsize = 7),
+                  column_split = chrom_split, column_title = "%s", column_title_rot = 0,
+                  column_title_gp = grid::gpar(fontsize = 8, fontface = "bold"),
                   row_names_gp = grid::gpar(fontsize = 8),
-                  show_column_names = FALSE,
-                  column_title = paste0("Genome-wide large SV (>= ", format(large_sv_min_bp, big.mark = ","),
-                                         " bp) location (", group_label, ")"),
-                  row_names_max_width = unit(longest_row_name * 0.09, "inches")))
+                  column_labels = hit_bin_order$Bin_Pos,
+                  column_names_gp = grid::gpar(fontsize = 6),
+                  column_names_rot = 90,
+                  row_names_max_width = unit(longest_row_name * 0.09, "inches"))
+    draw(ht, column_title = paste0("Genome-wide large SV (>= ", format(large_sv_min_bp, big.mark = ","),
+                                    " bp) location (", group_label, ") - facets are chromosomes, x-axis is Mb position"),
+         column_title_gp = grid::gpar(fontsize = 10))
   }, error = function(e) {
     plot.new(); text(0.5, 0.5, paste("Plot failed:", e$message))
   })
