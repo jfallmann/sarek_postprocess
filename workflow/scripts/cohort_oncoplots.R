@@ -68,18 +68,34 @@ run_group_oncoplots <- function(maf_pass, group_out_dir, group_label) {
   max_tsb_len <- max(nchar(tsb_vec), 1)
 
   if (n_genes >= 2) {
+    ## barcode_mar is oncoplot()'s own margin-width knob for the rotated
+    ## sample-name strip at the bottom (default 4, sized for ~short
+    ## barcodes) - our real barcodes ("BC217R_1_BC217_resistant"-style) are
+    ## far longer and were getting drawn overlapping the clinicalFeatures
+    ## annotation row above them because that default margin was too small,
+    ## not because the PDF page itself was too small. Scale it with the
+    ## longest barcode, and grow the PDF height to match, and shrink
+    ## SampleNamefontSize so more characters fit per unit of margin.
     oc_width <- max(21, n_samples * 0.6 + max_tsb_len * 0.15)
-    pdf(file.path(group_out_dir, "SummaryOncoplot.pdf"), width = oc_width, height = 21)
+    oc_height <- max(21, 14 + max_tsb_len * 0.35)
+    pdf(file.path(group_out_dir, "SummaryOncoplot.pdf"), width = oc_width, height = oc_height)
     safe_plot(print(oncoplot(maf = maf_pass, top = min(20, n_genes),
                    clinicalFeatures = "Contrast", sortByAnnotation = TRUE,
-                   showTumorSampleBarcodes = TRUE, removeNonMutated = TRUE)))
+                   showTumorSampleBarcodes = TRUE, removeNonMutated = TRUE,
+                   barcode_mar = max(6, max_tsb_len * 0.35), SampleNamefontSize = 0.7)))
     dev.off()
   } else {
     message("[", group_label, "] Not enough mutated genes (", n_genes, ") to draw cohort oncoplot")
   }
 
-  pdf(file.path(group_out_dir, "MAFSummary.pdf"), width = 21, height = 21)
-  safe_plot(plotmafSummary(maf = maf_pass, addStat = "median", dashboard = TRUE))
+  ## showBarcodes defaults to FALSE in plotmafSummary(), so the "variants per
+  ## sample" panel was silently plotted with no sample names at all - not
+  ## clipped, just never requested. Turn it on and shrink textSize with
+  ## sample count/barcode length so labels still fit.
+  mafsummary_height <- max(21, 14 + max_tsb_len * 0.35)
+  pdf(file.path(group_out_dir, "MAFSummary.pdf"), width = 21, height = mafsummary_height)
+  safe_plot(plotmafSummary(maf = maf_pass, addStat = "median", dashboard = TRUE,
+                            showBarcodes = TRUE, textSize = max(0.3, 0.8 - n_samples * 0.02)))
   dev.off()
 
   ## Gene-panel-restricted oncoplot, ported from GENOMICS/MAF_Analysis.R's
@@ -87,10 +103,12 @@ run_group_oncoplots <- function(maf_pass, group_out_dir, group_label) {
   present_panel <- intersect(gene_panel, maf_pass@gene.summary$Hugo_Symbol)
   if (length(present_panel) >= 2) {
     panel_width <- max(14, n_samples * 0.5 + max_tsb_len * 0.15)
-    pdf(file.path(group_out_dir, "DriverPanelOncoplot.pdf"), width = panel_width, height = 10)
+    panel_height <- max(10, 6 + max_tsb_len * 0.35)
+    pdf(file.path(group_out_dir, "DriverPanelOncoplot.pdf"), width = panel_width, height = panel_height)
     safe_plot(print(oncoplot(maf = maf_pass, genes = present_panel,
                               clinicalFeatures = "Contrast", sortByAnnotation = TRUE,
-                              showTumorSampleBarcodes = TRUE, removeNonMutated = FALSE)))
+                              showTumorSampleBarcodes = TRUE, removeNonMutated = FALSE,
+                              barcode_mar = max(6, max_tsb_len * 0.35), SampleNamefontSize = 0.7)))
     dev.off()
   } else {
     message("[", group_label, "] Skipping driver-panel oncoplot (", length(present_panel),

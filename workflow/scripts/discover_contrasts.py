@@ -281,17 +281,40 @@ def discover_cnvkit(cnvkit_dir, contrast_tumor_pairs):
         cns_path = None
         genemetrics_path = None
 
-        for key in (contrast, tumor_id):
-            if not key or cns_path is not None:
-                continue
+        # Sarek appends a library-count suffix to sample names when a sample
+        # has multiple libraries (e.g. "Bulk_resistant_1_vs_Bulk_sensitive_8"
+        # instead of the plain "Bulk_resistant_vs_Bulk_sensitive" contrast
+        # some other patients also happen to get). When that is the *only*
+        # mutect2/strelka contrast discovered for a pairing,
+        # resolve_tumor_normal() resolves tumor_id to the literal
+        # "Bulk_resistant_1" token, which never matches CNVkit's own
+        # directory naming ("Bulk_resistant", run once per real sample, not
+        # per library) - the whole contrast was silently dropped from CNV
+        # discovery. Also try the suffix-stripped tumor_id/contrast tumor
+        # token as fallback keys.
+        def _strip_lib_suffix(name):
+            return re.sub(r"_\d+$", "", name) if name else name
+
+        contrast_tumor_tok = contrast.split("_vs_", 1)[0] if contrast else contrast
+        candidate_keys = [
+            contrast, tumor_id,
+            _strip_lib_suffix(tumor_id), _strip_lib_suffix(contrast_tumor_tok),
+        ]
+        # de-duplicate while preserving lookup order
+        seen_keys = set()
+        candidate_keys = [k for k in candidate_keys if k and not (k in seen_keys or seen_keys.add(k))]
+
+        for key in candidate_keys:
+            if cns_path is not None:
+                break
             subdir = base / key
             if subdir.is_dir():
                 cns_path = _find_first(subdir, CNS_PATTERNS)
                 genemetrics_path = _find_first(subdir, GENEMETRICS_PATTERNS)
 
-        for key in (contrast, tumor_id):
-            if not key or cns_path is not None:
-                continue
+        for key in candidate_keys:
+            if cns_path is not None:
+                break
             for suffix in (".call.cns", ".cns"):
                 candidate = base / f"{key}{suffix}"
                 if candidate.is_file():
@@ -375,14 +398,24 @@ def main():
         # One (contrast, tumor_id) pair per contrast, regardless of how many
         # snv/indel/sv callers produced it.
         pairs = sorted({(r["contrast"], r["tumor_id"]) for r in rows if r["type"] != ""})
-        cnv_rows = []
+        # The library-suffix-stripped fallback added to discover_cnvkit()
+        # above can let two different (contrast, tumor_id) pairs sharing the
+        # same contrast name (one with tumor_id resolved, one left empty by
+        # resolve_tumor_normal) both resolve to the same .cns file - keep
+        # only one row per contrast (preferring a non-empty tumor_id, since
+        # pairs are visited in sorted order and "" sorts before any real
+        # tumor_id, a later row for the same contrast is always the more
+        # informative one) to avoid a duplicated contrast row downstream in
+        # the cohort CNV matrix/heatmap.
+        cnv_rows_by_contrast = {}
         for contrast, tumor_id, cns_path, genemetrics_path in discover_cnvkit(cnvkit_dir, pairs):
-            cnv_rows.append({
+            cnv_rows_by_contrast[contrast] = {
                 "contrast": contrast,
                 "tumor_id": tumor_id,
                 "cns_path": str(cns_path),
                 "genemetrics_path": str(genemetrics_path) if genemetrics_path else "",
-            })
+            }
+        cnv_rows = list(cnv_rows_by_contrast.values())
 
         Path(args.cnv_out).parent.mkdir(parents=True, exist_ok=True)
         with gzip.open(args.cnv_out, "wt", newline="") as fh:

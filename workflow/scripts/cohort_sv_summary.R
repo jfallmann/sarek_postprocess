@@ -228,7 +228,14 @@ plot_genome_heatmap <- function(large_sub_dt, contrasts_grp, out_path, group_lab
   bins[, Bin_Label := paste0("chr", Chromosome, ":", round(Bin_Start / 1e6), "Mb")]
   bins[, Global_Order := .I]
 
-  dt <- large_sub_dt[Chromosome %in% names(GRCH38_CHROM_LENGTHS)]
+  ## Manta/summarize_manta_sv.R report Chromosome with a "chr" prefix (e.g.
+  ## "chr2"), but GRCH38_CHROM_LENGTHS is keyed chr-less ("2") - matching the
+  ## raw Chromosome column against it always failed, silently dropping every
+  ## row and producing an empty heatmap even with large SVs present. Strip
+  ## the prefix before matching/binning.
+  dt <- copy(large_sub_dt)
+  dt[, Chromosome := sub("^chr", "", Chromosome)]
+  dt <- dt[Chromosome %in% names(GRCH38_CHROM_LENGTHS)]
   if (nrow(dt) == 0) {
     pdf(out_path); plot.new()
     text(0.5, 0.5, paste0("No SV >= ", format(large_sv_min_bp, big.mark = ","), " bp in group '", group_label, "'"))
