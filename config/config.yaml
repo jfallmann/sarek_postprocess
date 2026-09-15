@@ -169,10 +169,16 @@ sv_analysis:
   # copy-number-level confirmation - Manta's breakpoint-based DEL/DUP calls
   # and CNVkit's depth-based gain/loss calls are independent evidence.
   large_sv_min_bp: 1000000
-  # Bin size (Mb) for the genome-wide large-SV heatmap (sv_genome_heatmap.*.pdf)
-  # - shows, per contrast, which genomic bins carry a large-scale (>=
-  # large_sv_min_bp) DEL/DUP/INV, chromosome-ordered so you can see WHERE in
-  # the genome each sample's large events sit, not just how many it has.
+  # Bin size (Mb) for the genome-wide large-SV heatmaps - shows, per
+  # contrast, which genomic bins carry a large-scale (>= large_sv_min_bp)
+  # DEL/DUP/INV, chromosome-ordered so you can see WHERE in the genome each
+  # sample's large events sit, not just how many it has. Two versions are
+  # written: sv_genome_heatmap.*.pdf only shows bins with >=1 hit (compact,
+  # but column spacing is not to physical scale), and
+  # sv_genome_heatmap_full.*.pdf shows every bin genome-wide, including
+  # 0-hit ones (wider, but to physical scale within each chromosome - use
+  # this one to judge true extent/clustering, e.g. chromosome-arm-level
+  # duplications, which the compact version can visually collapse away).
   genome_heatmap_bin_mb: 5
 
 # --- Copy number variants (CNVkit) --------------------------------------------

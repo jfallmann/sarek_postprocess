@@ -34,6 +34,8 @@ out_large_plot_vs_reference <- snakemake@output[["large_sv_barplot_vs_reference"
 out_large_plot_vs_contrast  <- snakemake@output[["large_sv_barplot_vs_contrast"]]
 out_genome_heatmap_vs_reference <- snakemake@output[["genome_heatmap_vs_reference"]]
 out_genome_heatmap_vs_contrast  <- snakemake@output[["genome_heatmap_vs_contrast"]]
+out_genome_heatmap_full_vs_reference <- snakemake@output[["genome_heatmap_full_vs_reference"]]
+out_genome_heatmap_full_vs_contrast  <- snakemake@output[["genome_heatmap_full_vs_contrast"]]
 
 dir.create(dirname(out_burden), showWarnings = FALSE, recursive = TRUE)
 
@@ -65,7 +67,8 @@ dt_list <- Filter(Negate(is.null), dt_list)
 
 all_plot_outputs <- c(out_barplot_vs_reference, out_barplot_vs_contrast,
                       out_large_plot_vs_reference, out_large_plot_vs_contrast,
-                      out_genome_heatmap_vs_reference, out_genome_heatmap_vs_contrast)
+                      out_genome_heatmap_vs_reference, out_genome_heatmap_vs_contrast,
+                      out_genome_heatmap_full_vs_reference, out_genome_heatmap_full_vs_contrast)
 
 if (length(dt_list) == 0) {
   message("No Manta SV records across any contrast; writing empty cohort SV outputs")
@@ -214,7 +217,7 @@ plot_large_barplot(large_dt[is_vs_contrast_large], unique(count_dt$Contrast[is_v
 ## chromosome-ordered columns/rows and chromosome boundaries marked) -
 ## reused here with ComplexHeatmap (already a dependency for the CNV
 ## heatmap) instead of pulling in a dedicated circos/karyotype package.
-plot_genome_heatmap <- function(large_sub_dt, contrasts_grp, out_path, group_label) {
+plot_genome_heatmap <- function(large_sub_dt, contrasts_grp, out_path, group_label, keep_all_bins = FALSE) {
   if (length(contrasts_grp) == 0) {
     pdf(out_path); plot.new(); text(0.5, 0.5, paste0("No contrasts in group '", group_label, "'")); dev.off()
     return(invisible())
@@ -256,10 +259,14 @@ plot_genome_heatmap <- function(large_sub_dt, contrasts_grp, out_path, group_lab
   hit_counts <- merge(hit_counts, bins, by = c("Chromosome", "Bin_Start"))
   setorder(hit_counts, Global_Order)
 
-  ## Only keep bins that have >=1 hit in ANY contrast, in genomic order, so
-  ## the heatmap isn't mostly empty genome - but still ordered by position so
-  ## "where" is preserved.
-  hit_bin_order <- bins[Bin_Label %in% unique(hit_counts$Bin_Label)]
+  ## By default only keep bins that have >=1 hit in ANY contrast, in genomic
+  ## order, so the heatmap isn't mostly empty genome - but still ordered by
+  ## position so "where" is preserved. When keep_all_bins is TRUE, every bin
+  ## across the whole genome is kept instead (0-hit bins render white) so
+  ## that contiguous runs of hits - e.g. a whole chromosome-arm-level
+  ## duplication - are visible as a real contiguous block rather than being
+  ## collapsed next to unrelated, physically distant hits elsewhere.
+  hit_bin_order <- if (keep_all_bins) bins else bins[Bin_Label %in% unique(hit_counts$Bin_Label)]
   setorder(hit_bin_order, Global_Order)
 
   mat <- matrix(0L, nrow = length(contrasts_grp), ncol = nrow(hit_bin_order),
@@ -283,8 +290,19 @@ plot_genome_heatmap <- function(large_sub_dt, contrasts_grp, out_path, group_lab
   ## position is visible too, and the descriptive title is moved to
   ## draw()'s own column_title, which applies to the whole heatmap rather
   ## than overriding the per-slice ones.
+  ## The full-genome version has ~100x more columns than the hit-only one
+  ## (every bin genome-wide vs. only bins with a hit), so it uses a much
+  ## narrower per-column width and drops the per-bin Mb text labels
+  ## (unreadable at that density, and not the point of this view) -
+  ## chromosome facet titles still give genomic position context, and unlike
+  ## the hit-only view, facet width here IS proportional to chromosome length
+  ## (every bin is included, so a contiguous run/whole-arm event shows up as
+  ## a real contiguous colored block instead of being pulled next to
+  ## unrelated, physically distant hits).
+  col_width_in   <- if (keep_all_bins) 0.05 else 0.3
+  show_col_names <- !keep_all_bins
   pdf(out_path,
-      width = max(10, ncol(mat) * 0.3) + longest_row_name * 0.08,
+      width = max(10, ncol(mat) * col_width_in) + longest_row_name * 0.08,
       height = max(5, nrow(mat) * 0.4 + 1.5))
   tryCatch({
     ht <- Heatmap(mat, name = paste0("Large SV\ncount"),
@@ -293,12 +311,14 @@ plot_genome_heatmap <- function(large_sub_dt, contrasts_grp, out_path, group_lab
                   column_split = chrom_split, column_title = "%s", column_title_rot = 0,
                   column_title_gp = grid::gpar(fontsize = 8, fontface = "bold"),
                   row_names_gp = grid::gpar(fontsize = 8),
+                  show_column_names = show_col_names,
                   column_labels = hit_bin_order$Bin_Pos,
                   column_names_gp = grid::gpar(fontsize = 6),
                   column_names_rot = 90,
                   row_names_max_width = unit(longest_row_name * 0.09, "inches"))
     draw(ht, column_title = paste0("Genome-wide large SV (>= ", format(large_sv_min_bp, big.mark = ","),
-                                    " bp) location (", group_label, ") - facets are chromosomes, x-axis is Mb position"),
+                                    " bp) location (", group_label, ") - facets are chromosomes",
+                                    if (keep_all_bins) ", all bins shown (0-hit bins white) - x-axis is to physical scale within each chromosome" else ", x-axis is Mb position (only bins with >=1 hit are shown, so spacing is NOT to physical scale)"),
          column_title_gp = grid::gpar(fontsize = 10))
   }, error = function(e) {
     plot.new(); text(0.5, 0.5, paste("Plot failed:", e$message))
@@ -310,6 +330,10 @@ plot_genome_heatmap(large_dt[!is_vs_contrast_large], unique(count_dt$Contrast[!i
                      out_genome_heatmap_vs_reference, "vs_reference")
 plot_genome_heatmap(large_dt[is_vs_contrast_large], unique(count_dt$Contrast[is_vs_contrast_count]),
                      out_genome_heatmap_vs_contrast, "vs_contrast")
+plot_genome_heatmap(large_dt[!is_vs_contrast_large], unique(count_dt$Contrast[!is_vs_contrast_count]),
+                     out_genome_heatmap_full_vs_reference, "vs_reference", keep_all_bins = TRUE)
+plot_genome_heatmap(large_dt[is_vs_contrast_large], unique(count_dt$Contrast[is_vs_contrast_count]),
+                     out_genome_heatmap_full_vs_contrast, "vs_contrast", keep_all_bins = TRUE)
 
 ## Gene-level hit calls: explode Gene_Annotation into one row per gene ------
 ## symbol per SV record, restricted to Is_Pass by default (config

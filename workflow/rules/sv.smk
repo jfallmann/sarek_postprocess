@@ -58,6 +58,12 @@ rule cohort_sv_summary:
         # chromosome-ordered, one per contrast group (see cohort_sv_summary.R).
         genome_heatmap_vs_reference=f"{OUTDIR}/sv/cohort/sv_genome_heatmap.vs_reference.pdf",
         genome_heatmap_vs_contrast=f"{OUTDIR}/sv/cohort/sv_genome_heatmap.vs_contrast.pdf",
+        # Same heatmap but keeping every genomic bin (including 0-hit ones),
+        # so contiguous runs of white columns are visible - needed to judge
+        # true physical extent/clustering (e.g. whole chromosome-arm-level
+        # duplications), which the hit-only version above collapses away.
+        genome_heatmap_full_vs_reference=f"{OUTDIR}/sv/cohort/sv_genome_heatmap_full.vs_reference.pdf",
+        genome_heatmap_full_vs_contrast=f"{OUTDIR}/sv/cohort/sv_genome_heatmap_full.vs_contrast.pdf",
     params:
         common_r=f"{workflow.basedir}/scripts/common.R",
         contrasts=manta_contrasts,

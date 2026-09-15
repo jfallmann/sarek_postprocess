@@ -92,6 +92,8 @@ def get_all_targets(wildcards):
             targets.append(f"{OUTDIR}/sv/cohort/sv_large_events_barplot.vs_contrast.pdf")
             targets.append(f"{OUTDIR}/sv/cohort/sv_genome_heatmap.vs_reference.pdf")
             targets.append(f"{OUTDIR}/sv/cohort/sv_genome_heatmap.vs_contrast.pdf")
+            targets.append(f"{OUTDIR}/sv/cohort/sv_genome_heatmap_full.vs_reference.pdf")
+            targets.append(f"{OUTDIR}/sv/cohort/sv_genome_heatmap_full.vs_contrast.pdf")
     if config.get("cnv", {}).get("enabled", False):
         targets.append(f"{OUTDIR}/cnv/cohort/cnv_heatmap.vs_reference.pdf")
         targets.append(f"{OUTDIR}/cnv/cohort/cnv_heatmap.vs_contrast.pdf")
